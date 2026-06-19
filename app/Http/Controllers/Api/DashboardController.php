@@ -1,0 +1,485 @@
+<?php
+
+namespace App\Http\Controllers\Api;
+
+use App\Http\Controllers\Controller;
+use App\Models\Deployment;
+use App\Models\ServiceTemplate;
+use App\Enums\DeploymentStatus;
+use App\Enums\ServiceDuration;
+use App\Jobs\ProcessLeadJob;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Process;
+use Carbon\Carbon;
+
+class DashboardController extends Controller
+{
+    /**
+     * Get system stats.
+     */
+    public function stats(): JsonResponse
+    {
+        return response()->json([
+            'total_active' => Deployment::where('status', DeploymentStatus::ACTIVE)->count(),
+            'total_pending' => Deployment::where('status', DeploymentStatus::PENDING)->count(),
+            'total_expired' => Deployment::where('status', DeploymentStatus::EXPIRED)->count(),
+            'total_failed' => Deployment::where('status', DeploymentStatus::FAILED)->count(),
+            'total_templates' => ServiceTemplate::count(),
+            'total_revenue' => Deployment::whereIn('status', [DeploymentStatus::ACTIVE, DeploymentStatus::EXPIRED])->sum('price'),
+        ]);
+    }
+
+    /**
+     * Get list of all deployments with service template details.
+     */
+    public function deployments(): JsonResponse
+    {
+        $deployments = Deployment::with('serviceTemplate')
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return response()->json($deployments);
+    }
+
+    /**
+     * Get list of templates.
+     */
+    public function templates(): JsonResponse
+    {
+        return response()->json(ServiceTemplate::all());
+    }
+
+    /**
+     * Toggle a service template is_active status.
+     */
+    public function toggleTemplate($id): JsonResponse
+    {
+        $template = ServiceTemplate::findOrFail($id);
+        $template->update(['is_active' => !$template->is_active]);
+
+        return response()->json([
+            'success' => true,
+            'template' => $template
+        ]);
+    }
+
+    /**
+     * Create a new template.
+     */
+    public function storeTemplate(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'key' => 'required|string|unique:service_templates,key',
+            'name' => 'required|string',
+            'template_path' => 'required|string',
+            'is_active' => 'boolean',
+        ]);
+
+        $template = ServiceTemplate::create($validated);
+
+        return response()->json([
+            'success' => true,
+            'template' => $template
+        ], 201);
+    }
+
+    /**
+     * Trigger a teardown for an active deployment.
+     */
+    public function teardown($id): JsonResponse
+    {
+        $deployment = Deployment::findOrFail($id);
+
+        if ($deployment->status !== DeploymentStatus::ACTIVE) {
+            return response()->json(['error' => 'Only active deployments can be torn down.'], 400);
+        }
+
+        $instancePath = $deployment->instance_path;
+
+        try {
+            if (File::isDirectory($instancePath)) {
+                $teardownScript = $instancePath . '/teardown.sh';
+                if (File::exists($teardownScript)) {
+                    $processResult = Process::path($instancePath)
+                        ->timeout(60)
+                        ->run(['bash', 'teardown.sh', $deployment->client_slug]);
+
+                    if (!$processResult->successful()) {
+                        return response()->json([
+                            'error' => 'teardown.sh script failed.',
+                            'stdout' => $processResult->output(),
+                            'stderr' => $processResult->errorOutput()
+                        ], 500);
+                    }
+                }
+
+                // Move to archive folder
+                $archiveBase = config('deploy.archive_path');
+                if (!File::isDirectory($archiveBase)) {
+                    File::makeDirectory($archiveBase, 0755, true);
+                }
+                $archivePath = $archiveBase . '/' . $deployment->client_slug . '_' . now()->format('Ymd_His');
+                File::moveDirectory($instancePath, $archivePath);
+            }
+
+            $deployment->update(['status' => DeploymentStatus::EXPIRED]);
+
+            return response()->json(['success' => true, 'message' => 'Deployment torn down and archived.']);
+        } catch (\Exception $e) {
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Manually extend active deployment duration.
+     */
+    public function extend(Request $request, $id): JsonResponse
+    {
+        $deployment = Deployment::findOrFail($id);
+
+        if ($deployment->status !== DeploymentStatus::ACTIVE) {
+            return response()->json(['error' => 'Only active deployments can be extended.'], 400);
+        }
+
+        $validated = $request->validate([
+            'duration' => 'required|string'
+        ]);
+
+        $durationEnum = ServiceDuration::tryFrom($validated['duration']);
+        if (!$durationEnum) {
+            return response()->json(['error' => 'Invalid duration value.'], 400);
+        }
+
+        // Calculate new expiry date from current expires_at
+        $currentExpiry = Carbon::parse($deployment->expires_at);
+        $newExpiry = match ($durationEnum) {
+            ServiceDuration::ONE_WEEK => $currentExpiry->addWeek(),
+            ServiceDuration::ONE_MONTH => $currentExpiry->addMonth(),
+            ServiceDuration::THREE_MONTHS => $currentExpiry->addMonths(3),
+            ServiceDuration::SIX_MONTHS => $currentExpiry->addMonths(6),
+            ServiceDuration::ONE_YEAR => $currentExpiry->addYear(),
+        };
+
+        $deployment->update(['expires_at' => $newExpiry]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Deployment extended successfully.',
+            'new_expires_at' => $newExpiry
+        ]);
+    }
+
+    /**
+     * Retry a failed deployment by re-dispatching ProcessLeadJob.
+     */
+    public function retry($id): JsonResponse
+    {
+        $deployment = Deployment::findOrFail($id);
+
+        if ($deployment->status !== DeploymentStatus::FAILED) {
+            return response()->json(['error' => 'Only failed deployments can be retried.'], 400);
+        }
+
+        $rawResponse = json_decode($deployment->raw_llm_response, true);
+        if (empty($rawResponse)) {
+            return response()->json(['error' => 'No raw LLM response available to retry.'], 400);
+        }
+
+        // Simulated text that triggers reconstruction of this lead
+        $simulatedMessage = "Saya ingin mendeploy ulang " . $deployment->serviceTemplate->key . " untuk " . $deployment->client_slug;
+        
+        // Delete the failed deployment first so the validator doesn't block it as duplicate
+        $deployment->delete();
+
+        ProcessLeadJob::dispatch($simulatedMessage, $deployment->source, $deployment->lead_reference);
+
+        return response()->json(['success' => true, 'message' => 'Retry job dispatched.']);
+    }
+
+    /**
+     * Read the latest deploy-audit logs.
+     */
+    public function logs(): JsonResponse
+    {
+        $logPath = storage_path('logs/deploy-audit.log');
+        
+        if (!File::exists($logPath)) {
+            // Check daily log format: deploy-audit-YYYY-MM-DD.log
+            $logPath = storage_path('logs/deploy-audit-' . now()->format('Y-m-d') . '.log');
+        }
+
+        if (!File::exists($logPath)) {
+            return response()->json(['logs' => 'No deployment audit logs found yet.']);
+        }
+
+        // Read last 150 lines
+        $file = new \SplFileObject($logPath, 'r');
+        $file->seek(PHP_INT_MAX);
+        $totalLines = $file->key();
+        
+        $startLine = max(0, $totalLines - 150);
+        $lines = [];
+        
+        $file->seek($startLine);
+        while (!$file->eof()) {
+            $lines[] = $file->current();
+            $file->next();
+        }
+
+        return response()->json([
+            'logs' => implode('', array_filter($lines))
+        ]);
+    }
+
+    /**
+     * Run a sandbox simulated webhook test.
+     */
+    public function sandboxTest(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'message' => 'required|string',
+            'source' => 'required|string|in:telegram,whatsapp'
+        ]);
+
+        $leadRef = 'sandbox_' . time() . '_' . rand(100, 999);
+
+        ProcessLeadJob::dispatch($validated['message'], $validated['source'], $leadRef);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Simulated webhook dispatched successfully.',
+            'lead_reference' => $leadRef
+        ]);
+    }
+
+    /**
+     * Get the status of a sandbox deployment.
+     */
+    public function sandboxStatus($leadReference): JsonResponse
+    {
+        $deployment = Deployment::where('lead_reference', $leadReference)->first();
+
+        if (!$deployment) {
+            return response()->json([
+                'stage' => 'llm_analysis',
+                'status' => 'pending',
+                'message' => 'Hermes is analyzing the lead chat text...'
+            ]);
+        }
+
+        if ($deployment->status === DeploymentStatus::PENDING) {
+            return response()->json([
+                'stage' => 'deploying',
+                'status' => 'pending',
+                'message' => 'Replicating template filesystem and executing deploy.sh...',
+                'deployment' => $deployment
+            ]);
+        }
+
+        if ($deployment->status === DeploymentStatus::ACTIVE) {
+            return response()->json([
+                'stage' => 'completed',
+                'status' => 'active',
+                'message' => 'Deployment active and running successfully.',
+                'deployment' => $deployment
+            ]);
+        }
+
+        if ($deployment->status === DeploymentStatus::FAILED) {
+            return response()->json([
+                'stage' => 'completed',
+                'status' => 'failed',
+                'message' => 'Deployment script execution failed and folder has been rolled back.',
+                'deployment' => $deployment
+            ]);
+        }
+
+        return response()->json(['status' => 'unknown']);
+    }
+
+    /**
+     * Get LLM Agent / Worker configuration metadata.
+     */
+    public function getAgentConfig(\App\Services\HermesService $hermesService): JsonResponse
+    {
+        $apiUrl = env('HERMES_API_URL', 'http://localhost:11434/v1/chat/completions');
+        $apiKey = env('HERMES_API_KEY');
+        $model = env('HERMES_MODEL', 'hermes3');
+
+        $activeServiceKeys = ServiceTemplate::where('is_active', true)->pluck('key')->toArray();
+        $durationKeys = collect(\App\Enums\ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
+
+        $defaultSystemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys);
+
+        return response()->json([
+            'model' => $model,
+            'api_url' => $apiUrl,
+            'has_api_key' => !empty($apiKey),
+            'default_system_prompt' => $defaultSystemPrompt,
+        ]);
+    }
+
+    /**
+     * Send a custom chat to the LLM Agent / Worker.
+     */
+    public function agentChat(Request $request, \App\Services\HermesService $hermesService): JsonResponse
+    {
+        $validated = $request->validate([
+            'system_prompt' => 'required|string',
+            'message' => 'required|string',
+            'passkey' => 'required|string',
+        ]);
+
+        $correctPasskey = config('deploy.agent_passkey', '852963');
+
+        if ($validated['passkey'] !== $correctPasskey) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Akses ditolak. Passkey tidak valid.'
+            ], 403);
+        }
+
+        // Inject the Master / Developer recognition prompt
+        $injectedSystemPrompt = "CRITICAL IDENTITY RECOGNITION:\n" .
+            "The user you are chatting with is your Developer and Master: 'Ridzz'.\n" .
+            "Recognize him as your creator/developer/master. Greet him respectfully in Indonesian as 'Tuan Ridzz' or 'Ridzz'.\n\n" .
+            $validated['system_prompt'];
+
+        try {
+            $response = $hermesService->chat(
+                $injectedSystemPrompt,
+                $validated['message']
+            );
+
+            return response()->json([
+                'success' => true,
+                'response' => $response
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Upload template ZIP file.
+     */
+    public function uploadZip(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'zip_file' => 'required|file|mimes:zip|max:51200', // 50MB
+        ]);
+
+        $file = $request->file('zip_file');
+        $fileName = time() . '_' . $file->getClientOriginalName();
+        $uploadDir = storage_path('app/uploads');
+
+        if (!File::isDirectory($uploadDir)) {
+            File::makeDirectory($uploadDir, 0755, true);
+        }
+
+        $file->move($uploadDir, $fileName);
+
+        return response()->json([
+            'success' => true,
+            'filename' => $fileName,
+            'original_name' => $file->getClientOriginalName(),
+        ]);
+    }
+
+    /**
+     * List uploaded ZIP files.
+     */
+    public function listZips(): JsonResponse
+    {
+        $uploadDir = storage_path('app/uploads');
+        $zips = [];
+
+        if (File::isDirectory($uploadDir)) {
+            $files = File::files($uploadDir);
+            foreach ($files as $file) {
+                if ($file->getExtension() === 'zip') {
+                    $zips[] = [
+                        'filename' => $file->getFilename(),
+                        'size' => $file->getSize(),
+                        'uploaded_at' => Carbon::createFromTimestamp($file->getMTime())->toIso8601String()
+                    ];
+                }
+            }
+        }
+
+        // Sort by uploaded_at descending
+        usort($zips, fn($a, $b) => strcmp($b['uploaded_at'], $a['uploaded_at']));
+
+        return response()->json($zips);
+    }
+
+    /**
+     * Extract uploaded ZIP file and register template.
+     */
+    public function extractZip(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'filename' => 'required|string',
+            'key' => 'required|string|unique:service_templates,key|regex:/^[a-z0-9-]+$/',
+            'name' => 'required|string',
+        ]);
+
+        $filename = basename($validated['filename']); // Prevent directory traversal
+        $filePath = storage_path('app/uploads/' . $filename);
+
+        if (!File::exists($filePath)) {
+            return response()->json(['error' => 'ZIP file not found.'], 404);
+        }
+
+        $templateBaseDir = config('deploy.template_base_path');
+        $destinationFolder = $templateBaseDir . '/' . $validated['key'];
+
+        if (File::isDirectory($destinationFolder)) {
+            return response()->json(['error' => 'Destination template folder already exists.'], 400);
+        }
+
+        try {
+            if (!File::isDirectory($templateBaseDir)) {
+                File::makeDirectory($templateBaseDir, 0755, true);
+            }
+
+            // Extract using ZipArchive
+            $zip = new \ZipArchive;
+            if ($zip->open($filePath) === TRUE) {
+                File::makeDirectory($destinationFolder, 0755, true);
+                $zip->extractTo($destinationFolder);
+                $zip->close();
+            } else {
+                return response()->json(['error' => 'Failed to open ZIP archive.'], 500);
+            }
+
+            // Optional: delete uploaded zip file after extraction
+            File::delete($filePath);
+
+            // Register template in DB
+            $template = ServiceTemplate::create([
+                'key' => $validated['key'],
+                'name' => $validated['name'],
+                'template_path' => $validated['key'],
+                'is_active' => true
+            ]);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Template extracted and registered successfully.',
+                'template' => $template
+            ]);
+        } catch (\Exception $e) {
+            // Cleanup on failure
+            if (File::isDirectory($destinationFolder)) {
+                File::deleteDirectory($destinationFolder);
+            }
+            return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+}
