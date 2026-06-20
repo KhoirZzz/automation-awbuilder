@@ -1,20 +1,68 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactDOM from 'react-dom/client';
 import Dashboard from './views/Dashboard';
 import Templates from './views/Templates';
 import Logs from './views/Logs';
 import Sandbox from './views/Sandbox';
 import Agent from './views/Agent';
+import Login from './views/Login';
+
+// Fetch Interceptor for Admin Passkey authentication
+const originalFetch = window.fetch;
+window.fetch = async (url, options = {}) => {
+    const passkey = localStorage.getItem('admin_passkey') || '';
+    
+    // Only intercept requests to our local /api/ dashboard endpoints
+    if (url.includes('/api/dashboard/')) {
+        options.headers = {
+            ...options.headers,
+            'X-Admin-Passkey': passkey
+        };
+    }
+    
+    const response = await originalFetch(url, options);
+    
+    // Auto-logout on 401 Unauthorized responses
+    if (response.status === 401 && url.includes('/api/dashboard/')) {
+        localStorage.removeItem('admin_passkey');
+        window.dispatchEvent(new Event('admin-logged-out'));
+    }
+    
+    return response;
+};
 
 function App() {
-    // Read the active tab from localStorage to persist navigation state on page refreshes
+    const [isAuthenticated, setIsAuthenticated] = useState(() => {
+        return !!localStorage.getItem('admin_passkey');
+    });
+
     const [activeTab, setActiveTab] = useState(() => {
         return localStorage.getItem('active_tab') || 'dashboard';
     });
 
+    useEffect(() => {
+        const handleLogin = () => setIsAuthenticated(true);
+        const handleLogout = () => setIsAuthenticated(false);
+
+        window.addEventListener('admin-logged-in', handleLogin);
+        window.addEventListener('admin-logged-out', handleLogout);
+
+        return () => {
+            window.removeEventListener('admin-logged-in', handleLogin);
+            window.removeEventListener('admin-logged-out', handleLogout);
+        };
+    }, []);
+
     const handleTabChange = (tab) => {
         setActiveTab(tab);
         localStorage.setItem('active_tab', tab);
+    };
+
+    const handleLogoutAction = () => {
+        if (confirm('Lock admin gateway?')) {
+            localStorage.removeItem('admin_passkey');
+            window.dispatchEvent(new Event('admin-logged-out'));
+        }
     };
 
     const renderView = () => {
@@ -28,6 +76,10 @@ function App() {
         }
     };
 
+    if (!isAuthenticated) {
+        return <Login />;
+    }
+
     return (
         <div className="flex flex-col lg:flex-row min-h-screen bg-black text-zinc-100 selection:bg-zinc-800 selection:text-white">
             {/* Top Bar for Mobile/Tablet */}
@@ -40,9 +92,20 @@ function App() {
                         <span className="font-bold text-zinc-100 tracking-tight text-xs uppercase block font-mono">AUTODEPLOY</span>
                     </div>
                 </div>
-                <div className="flex items-center gap-1.5">
-                    <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
-                    <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Online</span>
+                <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                        <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
+                        <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Online</span>
+                    </div>
+                    <button 
+                        onClick={handleLogoutAction}
+                        title="Lock Gateway"
+                        className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                    >
+                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                    </button>
                 </div>
             </header>
 
@@ -67,7 +130,7 @@ function App() {
                                 : 'text-zinc-500 border border-transparent hover:text-zinc-300'
                         }`}
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
                         </svg>
                         <span>Dashboard</span>
@@ -80,7 +143,7 @@ function App() {
                                 : 'text-zinc-500 border border-transparent hover:text-zinc-300'
                         }`}
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9" />
                         </svg>
                         <span>Templates</span>
@@ -93,7 +156,7 @@ function App() {
                                 : 'text-zinc-500 border border-transparent hover:text-zinc-300'
                         }`}
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M17.25 6.75L22.5 12l-5.25 5.25m-10.5 0L1.5 12l5.25-5.25m7.5-3l-4.5 16.5" />
                         </svg>
                         <span>Audit Logs</span>
@@ -106,7 +169,7 @@ function App() {
                                 : 'text-zinc-500 border border-transparent hover:text-zinc-300'
                         }`}
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                         <span>Sandbox</span>
@@ -119,16 +182,26 @@ function App() {
                                 : 'text-zinc-500 border border-transparent hover:text-zinc-300'
                         }`}
                     >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                        <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 3v1.5M4.5 8.25H3m1.5 7.5H3m15-7.5h1.5m-1.5 7.5h1.5m-10.5-12h7.5A2.25 2.25 0 0118 4.5v15a2.25 2.25 0 01-2.25 2.25H8.25A2.25 2.25 0 016 19.5v-15A2.25 2.25 0 018.25 2.25zM13.5 9h-3a.75.75 0 00-.75.75v3c0 .414.336.75.75.75h3a.75.75 0 00.75-.75v-3a.75.75 0 00-.75-.75z" />
                         </svg>
                         <span>AI Worker</span>
                     </button>
+
+                    <button
+                        onClick={handleLogoutAction}
+                        className="flex items-center gap-3 px-3.5 py-2.5 rounded text-xs font-mono font-semibold uppercase tracking-wider text-red-500 hover:text-red-400 border border-transparent hover:border-red-950 transition-all mt-4 w-full text-left bg-zinc-950/20"
+                    >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        </svg>
+                        <span>Lock Gateway</span>
+                    </button>
                 </nav>
 
-                <div className="mt-auto pt-6 border-t border-zinc-900 flex flex-col gap-1">
-                    <span className="text-zinc-600 text-[9px] font-bold tracking-wider uppercase font-mono">Server Status</span>
-                    <span className="text-[11px] font-mono font-semibold text-zinc-400 flex items-center gap-2">
+                <div className="mt-auto pt-6 border-t border-zinc-900 flex flex-col gap-1 font-mono">
+                    <span className="text-zinc-600 text-[9px] font-bold tracking-wider uppercase">Server Status</span>
+                    <span className="text-[11px] font-semibold text-zinc-400 flex items-center gap-2">
                         <span className="h-1.5 w-1.5 bg-white rounded-full animate-pulse"></span>
                         Active Audit Engine
                     </span>
@@ -144,7 +217,7 @@ function App() {
                     }`}
                 >
                     <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25z" />
                     </svg>
                     <span>Status</span>
                 </button>

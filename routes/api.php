@@ -19,7 +19,7 @@ Route::post('/webhook/whatsapp', [LeadWebhookController::class, 'whatsapp'])
 
 use App\Http\Controllers\Api\DashboardController;
 
-Route::prefix('/dashboard')->group(function () {
+Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey::class)->group(function () {
     Route::get('/stats', [DashboardController::class, 'stats']);
     Route::get('/deployments', [DashboardController::class, 'deployments']);
     Route::get('/templates', [DashboardController::class, 'templates']);

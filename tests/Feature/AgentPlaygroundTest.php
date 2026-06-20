@@ -22,7 +22,9 @@ class AgentPlaygroundTest extends TestCase
             'deploy.template_base_path' => storage_path('templates'),
         ]);
 
-        $response = $this->getJson('/api/dashboard/agent/config');
+        $response = $this->getJson('/api/dashboard/agent/config', [
+            'X-Admin-Passkey' => '852963'
+        ]);
 
         $response->assertStatus(200);
         $response->assertJsonStructure([
@@ -51,6 +53,8 @@ class AgentPlaygroundTest extends TestCase
             'system_prompt' => 'You are a helpful assistant.',
             'message' => 'Hello AI Worker!',
             'passkey' => '852963'
+        ], [
+            'X-Admin-Passkey' => '852963'
         ]);
 
         $response->assertStatus(200);
@@ -70,6 +74,8 @@ class AgentPlaygroundTest extends TestCase
             'system_prompt' => 'You are a helpful assistant.',
             'message' => 'Hello AI Worker!',
             'passkey' => '852963'
+        ], [
+            'X-Admin-Passkey' => '852963'
         ]);
 
         $response->assertStatus(500);
@@ -84,6 +90,8 @@ class AgentPlaygroundTest extends TestCase
             'system_prompt' => 'You are a helpful assistant.',
             'message' => 'Hello AI Worker!',
             'passkey' => 'wrongkey'
+        ], [
+            'X-Admin-Passkey' => '852963'
         ]);
 
         $response->assertStatus(403);

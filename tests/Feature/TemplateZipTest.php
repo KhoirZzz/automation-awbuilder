@@ -25,6 +25,7 @@ class TemplateZipTest extends TestCase
 
         config([
             'deploy.template_base_path' => $this->templateDir,
+            'deploy.agent_passkey' => '852963'
         ]);
 
         if (File::isDirectory($this->uploadDir)) {
@@ -53,6 +54,8 @@ class TemplateZipTest extends TestCase
 
         $response = $this->postJson('/api/dashboard/templates/upload-zip', [
             'zip_file' => $file,
+        ], [
+            'X-Admin-Passkey' => '852963'
         ]);
 
         $response->assertStatus(200);
@@ -72,7 +75,9 @@ class TemplateZipTest extends TestCase
         File::put($this->uploadDir . '/archive2.zip', 'content');
         File::put($this->uploadDir . '/not-a-zip.txt', 'content');
 
-        $response = $this->getJson('/api/dashboard/templates/zips');
+        $response = $this->getJson('/api/dashboard/templates/zips', [
+            'X-Admin-Passkey' => '852963'
+        ]);
 
         $response->assertStatus(200);
         $response->assertJsonCount(2);
@@ -98,6 +103,8 @@ class TemplateZipTest extends TestCase
             'filename' => 'test-extract.zip',
             'key' => 'my-custom-service',
             'name' => 'My Custom Service Name'
+        ], [
+            'X-Admin-Passkey' => '852963'
         ]);
 
         $response->assertStatus(200);
@@ -128,6 +135,8 @@ class TemplateZipTest extends TestCase
             'filename' => 'nonexistent.zip',
             'key' => 'INVALID KEY!##',
             'name' => 'Test'
+        ], [
+            'X-Admin-Passkey' => '852963'
         ]);
 
         $response->assertStatus(422); // Validation error
