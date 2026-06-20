@@ -129,37 +129,8 @@ export default function Agent() {
             )}
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* System Prompt / Custom Instructions (Left) */}
-                <div className="lg:col-span-5 space-y-4">
-                    <Card 
-                        title="System Instructions" 
-                        action={
-                            <Button size="sm" variant="secondary" onClick={handleResetPrompt}>
-                                Reset to Default
-                            </Button>
-                        }
-                    >
-                        <div className="space-y-4">
-                            <p className="text-zinc-500 leading-normal">
-                                Modifikasi instruksi sistem di bawah ini untuk mengatur cara berpikir, gaya bahasa, dan kemampuan ekstraksi model AI saat menangani lead.
-                            </p>
-                            <textarea
-                                rows="18"
-                                value={systemPrompt}
-                                onChange={(e) => setSystemPrompt(e.target.value)}
-                                className="w-full bg-zinc-900 border border-zinc-800 rounded-lg p-3.5 text-white font-mono text-[11px] leading-relaxed focus:outline-none focus:border-zinc-500 resize-none"
-                                placeholder="Paste or write custom system instructions prompt here..."
-                            />
-                            <div className="p-3 bg-zinc-950 border border-zinc-900 rounded text-zinc-650 text-[10px] leading-normal uppercase">
-                                <span className="font-bold text-zinc-500 block mb-0.5">ℹ️ System Note</span>
-                                Mengubah instruksi di sini hanya akan memengaruhi sesi simulasi chat di layar Agent saat ini. Logika webhook produksi tetap menggunakan template bawaan.
-                            </div>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* Chat Interactive Playground (Right) */}
-                <div className="lg:col-span-7 flex flex-col h-full">
+                {/* Chat Interactive Playground (Full Width) */}
+                <div className="lg:col-span-12 flex flex-col h-full">
                     <Card 
                         title="AI Worker Workspace"
                         action={
@@ -167,7 +138,7 @@ export default function Agent() {
                                 Clear History
                             </Button>
                         }
-                        className="flex flex-col h-[525px]"
+                        className="flex flex-col h-[600px]"
                     >
                         {/* Conversation Box */}
                         {passkey.length < 6 ? (
@@ -181,7 +152,7 @@ export default function Agent() {
                                 </p>
                             </div>
                         ) : (
-                            <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 h-[350px] min-h-[350px] max-h-[350px] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                            <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 h-[440px] min-h-[440px] max-h-[440px] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                                 {chatHistory.map((msg, index) => (
                                     <div 
                                         key={index} 
@@ -219,9 +190,9 @@ export default function Agent() {
                                 type="text"
                                 value={userMessage}
                                 onChange={(e) => setUserMessage(e.target.value)}
-                                placeholder={passkey.length < 6 ? "Masukkan passkey terlebih dahulu..." : "Tulis pesan atau instruksi pengujian di sini..."}
+                                placeholder={passkey.length < 6 ? "Masukkan passkey terlebih dahulu..." : "Tanya apa saja mengenai sistem auto-deployment atau berikan instruksi..."}
                                 disabled={loading || passkey.length < 6}
-                                className="flex-1 bg-zinc-900 border border-zinc-850 hover:border-zinc-800 focus:border-zinc-600 rounded-lg px-4 py-3 text-white focus:outline-none placeholder-zinc-700 text-xs font-mono disabled:opacity-40"
+                                className="flex-1 bg-zinc-900 border border-zinc-855 hover:border-zinc-800 focus:border-zinc-600 rounded-lg px-4 py-3 text-white focus:outline-none placeholder-zinc-700 text-xs font-mono disabled:opacity-40"
                             />
                             <Button 
                                 type="submit" 

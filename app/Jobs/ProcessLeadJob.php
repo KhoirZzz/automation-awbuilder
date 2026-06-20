@@ -14,6 +14,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Cache;
 use Throwable;
 
 class ProcessLeadJob implements ShouldQueue
@@ -53,6 +54,13 @@ class ProcessLeadJob implements ShouldQueue
             'source' => $this->source,
         ]);
 
+        // Start stage: llm_analysis
+        Cache::put("sandbox_status_{$this->leadReference}", [
+            'stage' => 'llm_analysis',
+            'status' => 'pending',
+            'message' => 'Hermes is analyzing the lead chat text...'
+        ], 600);
+
         // Get all active templates
         $activeTemplates = ServiceTemplate::where('is_active', true)->get();
 
@@ -66,9 +74,22 @@ class ProcessLeadJob implements ShouldQueue
                 'error' => $e->getMessage()
             ]);
 
+            Cache::put("sandbox_status_{$this->leadReference}", [
+                'stage' => 'llm_analysis',
+                'status' => 'failed',
+                'message' => 'Transient Hermes connection failed: ' . $e->getMessage()
+            ], 600);
+
             // Re-throw so Laravel's queue manager retries the job
             throw $e;
         }
+
+        // Start stage: validation
+        Cache::put("sandbox_status_{$this->leadReference}", [
+            'stage' => 'validation',
+            'status' => 'pending',
+            'message' => 'Validating extracted metadata against system policies...'
+        ], 600);
 
         try {
             // Validate the raw result from Hermes
@@ -80,6 +101,13 @@ class ProcessLeadJob implements ShouldQueue
                 'lead_reference' => $this->leadReference,
                 'message' => $e->getMessage()
             ]);
+
+            Cache::put("sandbox_status_{$this->leadReference}", [
+                'stage' => 'validation',
+                'status' => 'failed',
+                'message' => 'Lead rejected due to validation failure: ' . $e->getMessage()
+            ], 600);
+
             return;
         }
 

@@ -85,6 +85,31 @@ export default function Sandbox() {
 
         if (stageKey === 'webhook') return 'success';
 
+        // 1. Exact matching for cache-based high-fidelity stages
+        const stageOrder = ['webhook', 'llm_analysis', 'validation', 'replication', 'script_execution', 'completed'];
+        
+        if (stageOrder.includes(stage)) {
+            const currentStageIndex = stageOrder.indexOf(stage);
+            const targetStageIndex = stageOrder.indexOf(stageKey);
+
+            if (status === 'failed') {
+                if (stageKey === stage) return 'error';
+                if (targetStageIndex < currentStageIndex) return 'success';
+                return 'waiting';
+            }
+
+            if (status === 'pending') {
+                if (stageKey === stage) return 'pending';
+                if (targetStageIndex < currentStageIndex) return 'success';
+                return 'waiting';
+            }
+
+            if (status === 'active' || status === 'completed') {
+                return 'success';
+            }
+        }
+
+        // 2. Fallback for legacy database-based stages (for compatibility)
         if (stage === 'llm_analysis') {
             if (stageKey === 'llm_analysis') return 'pending';
             return 'waiting';

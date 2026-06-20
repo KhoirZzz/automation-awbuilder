@@ -9,6 +9,7 @@ use App\Models\ServiceTemplate;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Process;
+use Illuminate\Support\Facades\Cache;
 use Exception;
 
 class DeployServiceAction
@@ -50,6 +51,13 @@ class DeployServiceAction
             'template_path' => $templatePath,
             'instance_path' => $instancePath
         ]);
+
+        // Start stage: replication
+        Cache::put("sandbox_status_{$result->leadReference}", [
+            'stage' => 'replication',
+            'status' => 'pending',
+            'message' => 'Cloning template directory and injecting configuration files...'
+        ], 600);
 
         try {
             // Validate template path existence
@@ -138,6 +146,13 @@ class DeployServiceAction
                     'arg' => $result->clientSlug
                 ]);
 
+                // Start stage: script_execution
+                Cache::put("sandbox_status_{$result->leadReference}", [
+                    'stage' => 'script_execution',
+                    'status' => 'pending',
+                    'message' => 'Running post-cloning deploy.sh configuration script...'
+                ], 600);
+
                 // Execute using process with array format and timeout
                 $processResult = Process::path($instancePath)
                     ->timeout(60)
@@ -170,6 +185,12 @@ class DeployServiceAction
                 'client_slug' => $result->clientSlug
             ]);
 
+            Cache::put("sandbox_status_{$result->leadReference}", [
+                'stage' => 'completed',
+                'status' => 'active',
+                'message' => 'Deployment active and running successfully.'
+            ], 600);
+
             return $deployment;
 
         } catch (Exception $e) {
@@ -190,6 +211,17 @@ class DeployServiceAction
                 'deployment_id' => $deployment->id,
                 'error' => $e->getMessage()
             ]);
+
+            // Cache stage failure
+            $failedStage = 'replication';
+            if (isset($scriptPath) && File::exists($scriptPath)) {
+                $failedStage = 'script_execution';
+            }
+            Cache::put("sandbox_status_{$result->leadReference}", [
+                'stage' => $failedStage,
+                'status' => 'failed',
+                'message' => 'Deployment failed: ' . $e->getMessage()
+            ], 600);
 
             throw $e;
         }

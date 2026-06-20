@@ -254,49 +254,55 @@ class DashboardController extends Controller
         ]);
     }
 
-    /**
-     * Get the status of a sandbox deployment.
-     */
     public function sandboxStatus($leadReference): JsonResponse
     {
         $deployment = Deployment::where('lead_reference', $leadReference)->first();
+        $cachedStatus = \Illuminate\Support\Facades\Cache::get("sandbox_status_{$leadReference}");
 
-        if (!$deployment) {
-            return response()->json([
-                'stage' => 'llm_analysis',
-                'status' => 'pending',
-                'message' => 'Hermes is analyzing the lead chat text...'
-            ]);
+        if ($deployment) {
+            if ($deployment->status === DeploymentStatus::ACTIVE) {
+                return response()->json([
+                    'stage' => 'completed',
+                    'status' => 'active',
+                    'message' => 'Deployment active and running successfully.',
+                    'deployment' => $deployment
+                ]);
+            }
+
+            if ($deployment->status === DeploymentStatus::FAILED) {
+                if ($cachedStatus && $cachedStatus['status'] === 'failed') {
+                    return response()->json(array_merge($cachedStatus, ['deployment' => $deployment]));
+                }
+                return response()->json([
+                    'stage' => 'completed',
+                    'status' => 'failed',
+                    'message' => 'Deployment script execution failed and folder has been rolled back.',
+                    'deployment' => $deployment
+                ]);
+            }
+
+            if ($deployment->status === DeploymentStatus::PENDING) {
+                if ($cachedStatus) {
+                    return response()->json(array_merge($cachedStatus, ['deployment' => $deployment]));
+                }
+                return response()->json([
+                    'stage' => 'deploying',
+                    'status' => 'pending',
+                    'message' => 'Replicating template filesystem and executing deploy.sh...',
+                    'deployment' => $deployment
+                ]);
+            }
         }
 
-        if ($deployment->status === DeploymentStatus::PENDING) {
-            return response()->json([
-                'stage' => 'deploying',
-                'status' => 'pending',
-                'message' => 'Replicating template filesystem and executing deploy.sh...',
-                'deployment' => $deployment
-            ]);
+        if ($cachedStatus) {
+            return response()->json($cachedStatus);
         }
 
-        if ($deployment->status === DeploymentStatus::ACTIVE) {
-            return response()->json([
-                'stage' => 'completed',
-                'status' => 'active',
-                'message' => 'Deployment active and running successfully.',
-                'deployment' => $deployment
-            ]);
-        }
-
-        if ($deployment->status === DeploymentStatus::FAILED) {
-            return response()->json([
-                'stage' => 'completed',
-                'status' => 'failed',
-                'message' => 'Deployment script execution failed and folder has been rolled back.',
-                'deployment' => $deployment
-            ]);
-        }
-
-        return response()->json(['status' => 'unknown']);
+        return response()->json([
+            'stage' => 'llm_analysis',
+            'status' => 'pending',
+            'message' => 'Hermes is analyzing the lead chat text...'
+        ]);
     }
 
     /**
