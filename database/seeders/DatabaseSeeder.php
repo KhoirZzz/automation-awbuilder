@@ -35,5 +35,12 @@ class DatabaseSeeder extends Seeder
             'template_path' => 'shopee-spm',
             'is_active' => true,
         ]);
+
+        \App\Models\ServiceTemplate::create([
+            'key' => 'blank',
+            'name' => 'Blank Template (From Scratch)',
+            'template_path' => 'blank',
+            'is_active' => true,
+        ]);
     }
 }

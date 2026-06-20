@@ -55,11 +55,11 @@ HERMES_MODEL="stepfun-ai/step-3.7-flash"
 # ==============================================================================
 
 # 1. Token Bot Telegram Anda yang didapatkan dari @BotFather
-TELEGRAM_BOT_TOKEN="MASUKKAN_TELEGRAM_BOT_TOKEN_DISINI"
+TELEGRAM_BOT_TOKEN="8922380146:AAHjRyAV9U4s2pxCElbGnm92K0LDzQqhzd4"
 
 # 2. Token rahasia buatan Anda sendiri untuk memvalidasi request webhook dari Telegram
 # (Gunakan string acak aman, hanya berisi huruf, angka, '_', dan '-')
-TELEGRAM_BOT_SECRET_TOKEN="MASUKKAN_TELEGRAM_BOT_SECRET_TOKEN_DISINI"
+TELEGRAM_BOT_SECRET_TOKEN="YANTOLI-DADA-12239"
 
 # 3. ID Chat Telegram Anda sendiri (sebagai administrator yang menyetujui pembayaran)
-TELEGRAM_ADMIN_CHAT_ID="MASUKKAN_TELEGRAM_ADMIN_CHAT_ID_DISINI"
+TELEGRAM_ADMIN_CHAT_ID="7860981010"

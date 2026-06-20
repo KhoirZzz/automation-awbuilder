@@ -60,9 +60,14 @@ class DeployServiceAction
         ], 600);
 
         try {
-            // Validate template path existence
-            if (!File::isDirectory($templatePath)) {
-                throw new Exception("Template directory does not exist: {$templatePath}");
+            // Check if this is a blank/empty template (start from scratch)
+            $isBlank = ($serviceTemplate->key === 'blank' || $serviceTemplate->template_path === 'blank' || $serviceTemplate->template_path === 'empty');
+
+            if (!$isBlank) {
+                // Validate template path existence
+                if (!File::isDirectory($templatePath)) {
+                    throw new Exception("Template directory does not exist: {$templatePath}");
+                }
             }
 
             // Ensure base instances path exists
@@ -70,16 +75,23 @@ class DeployServiceAction
                 File::makeDirectory($instanceBasePath, 0755, true);
             }
 
-            // 2. Clone template (filesystem copy)
+            // 2. Clone template (filesystem copy) or create empty directory
             if (File::exists($instancePath)) {
                 throw new Exception("Destination directory already exists: {$instancePath}");
             }
 
-            Log::channel('deploy-audit')->info('Copying template directory...', [
-                'from' => $templatePath,
-                'to' => $instancePath
-            ]);
-            File::copyDirectory($templatePath, $instancePath);
+            if ($isBlank) {
+                Log::channel('deploy-audit')->info('Creating empty instance directory for blank template...', [
+                    'to' => $instancePath
+                ]);
+                File::makeDirectory($instancePath, 0755, true);
+            } else {
+                Log::channel('deploy-audit')->info('Copying template directory...', [
+                    'from' => $templatePath,
+                    'to' => $instancePath
+                ]);
+                File::copyDirectory($templatePath, $instancePath);
+            }
 
             // 3. Write .env file
             $exampleEnvPath = $instancePath . '/.env.example';

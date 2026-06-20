@@ -133,6 +133,38 @@ class DeployServiceActionTest extends TestCase
         $this->assertTrue(File::isDirectory($this->testInstanceBase . '/my-payment-bot'));
     }
 
+    public function test_deploy_service_action_blank_template(): void
+    {
+        $blankTemplate = ServiceTemplate::create([
+            'key' => 'blank',
+            'name' => 'Blank Template',
+            'template_path' => 'blank',
+            'is_active' => true,
+        ]);
+
+        $result = new LeadAnalysisResult(
+            serviceTemplateId: $blankTemplate->id,
+            duration: ServiceDuration::ONE_WEEK,
+            clientSlug: 'my-blank-bot',
+            expiresAt: now()->addWeek(),
+            source: 'agent',
+            leadReference: 'tg_789',
+            price: 100000,
+            rawLlmResponse: '{"service_key":"blank"}'
+        );
+
+        $action = new DeployServiceAction();
+        $deployment = $action->execute($result);
+
+        $this->assertEquals(DeploymentStatus::ACTIVE, $deployment->status);
+        $this->assertTrue(File::isDirectory($this->testInstanceBase . '/my-blank-bot'));
+        $this->assertTrue(File::exists($this->testInstanceBase . '/my-blank-bot/.env'));
+
+        $env = File::get($this->testInstanceBase . '/my-blank-bot/.env');
+        $this->assertStringContainsString('CLIENT_SLUG=my-blank-bot', $env);
+        $this->assertStringContainsString('DEPLOY_EXPIRES_AT=', $env);
+    }
+
     public function test_deploy_service_action_failure_rolls_back(): void
     {
         // Script execution fails
