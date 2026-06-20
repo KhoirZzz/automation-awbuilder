@@ -33,7 +33,9 @@ Route::prefix('/dashboard')->group(function () {
     Route::get('/sandbox/status/{lead_reference}', [DashboardController::class, 'sandboxStatus']);
     Route::get('/agent/config', [DashboardController::class, 'getAgentConfig']);
     Route::post('/agent/chat', [DashboardController::class, 'agentChat']);
+    Route::post('/agent/deploy', [DashboardController::class, 'agentDeploy']);
     Route::post('/templates/upload-zip', [DashboardController::class, 'uploadZip']);
     Route::post('/templates/extract-zip', [DashboardController::class, 'extractZip']);
     Route::get('/templates/zips', [DashboardController::class, 'listZips']);
 });
+

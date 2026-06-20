@@ -333,8 +333,9 @@ class DashboardController extends Controller
     public function agentChat(Request $request, \App\Services\HermesService $hermesService): JsonResponse
     {
         $validated = $request->validate([
-            'system_prompt' => 'required|string',
-            'message' => 'required|string',
+            'system_prompt' => 'nullable|string',
+            'message' => 'nullable|string',
+            'messages' => 'nullable|array',
             'passkey' => 'required|string',
         ]);
 
@@ -347,16 +348,23 @@ class DashboardController extends Controller
             ], 403);
         }
 
+        // Always build the prompt dynamically based on the current database state
+        $activeServiceKeys = ServiceTemplate::where('is_active', true)->pluck('key')->toArray();
+        $durationKeys = collect(\App\Enums\ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
+        $systemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys);
+
         // Inject the Master / Developer recognition prompt
         $injectedSystemPrompt = "CRITICAL IDENTITY RECOGNITION:\n" .
             "The user you are chatting with is your Developer and Master: 'Ridzz'.\n" .
             "Recognize him as your creator/developer/master. Greet him respectfully in Indonesian as 'Tuan Ridzz' or 'Ridzz'.\n\n" .
-            $validated['system_prompt'];
+            $systemPrompt;
+
+        $messagesInput = $validated['messages'] ?? $validated['message'];
 
         try {
             $response = $hermesService->chat(
                 $injectedSystemPrompt,
-                $validated['message']
+                $messagesInput
             );
 
             return response()->json([
@@ -486,6 +494,95 @@ class DashboardController extends Controller
                 File::deleteDirectory($destinationFolder);
             }
             return response()->json(['error' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Directly trigger deployment from the AI Worker chat interface.
+     */
+    public function agentDeploy(Request $request, \App\Actions\DeployServiceAction $deployAction): JsonResponse
+    {
+        $validated = $request->validate([
+            'service_key' => 'required|string',
+            'durasi' => 'required|string',
+            'client_slug_request' => 'required|string',
+            'telegram_token' => 'required|string',
+            'telegram_chat_id' => 'required|string',
+            'price' => 'nullable',
+        ]);
+
+        $serviceTemplate = ServiceTemplate::where('key', $validated['service_key'])->first();
+        if (!$serviceTemplate || !$serviceTemplate->is_active) {
+            return response()->json(['success' => false, 'error' => 'Template not found or inactive.'], 400);
+        }
+
+        // Validate slug compliance
+        $clientSlug = strtolower(trim($validated['client_slug_request']));
+        if (!preg_match('/^[a-z0-9](-?[a-z0-9])*$/', $clientSlug) || strlen($clientSlug) > 63 || strlen($clientSlug) < 2) {
+            return response()->json(['success' => false, 'error' => 'Slug tidak sesuai format DNS.'], 400);
+        }
+
+        // Check reserved words
+        $reserved = config('deploy.reserved_slugs', []);
+        if (in_array($clientSlug, $reserved)) {
+            return response()->json(['success' => false, 'error' => 'Slug merupakan kata terlarang sistem.'], 400);
+        }
+
+        // Check duplicates
+        $duplicate = Deployment::where('client_slug', $clientSlug)
+            ->whereIn('status', [DeploymentStatus::PENDING, DeploymentStatus::ACTIVE])
+            ->first();
+        if ($duplicate) {
+            return response()->json(['success' => false, 'error' => 'Subdomain/Slug ini sudah aktif digunakan.'], 400);
+        }
+
+        // Parse price
+        $price = null;
+        if (!empty($validated['price'])) {
+            $price = (int)$validated['price'];
+        }
+
+        // Map duration enum
+        $durationEnum = \App\Enums\ServiceDuration::fromValue($validated['durasi']);
+        if (!$durationEnum) {
+            return response()->json(['success' => false, 'error' => 'Durasi tidak valid.'], 400);
+        }
+
+        // Build DTO
+        $result = new \App\DataTransferObjects\LeadAnalysisResult(
+            serviceTemplateId: $serviceTemplate->id,
+            duration: $durationEnum,
+            clientSlug: $clientSlug,
+            expiresAt: $durationEnum->calculateExpiry(),
+            source: 'telegram',
+            leadReference: 'agent_' . time() . '_' . rand(100, 999),
+            price: $price,
+            rawLlmResponse: json_encode($validated)
+        );
+
+        try {
+            // Execute deployment
+            $deployment = $deployAction->execute($result);
+
+            // Construct final URL
+            $host = $request->getHost();
+            $baseDomain = 'mockbuild.shop';
+            if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $host)) {
+                $baseDomain = $host;
+            }
+            $clientUrl = "http://{$clientSlug}.{$baseDomain}";
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Deployment successful!',
+                'url' => $clientUrl,
+                'deployment' => $deployment
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Deployment failed: ' . $e->getMessage()
+            ], 500);
         }
     }
 }

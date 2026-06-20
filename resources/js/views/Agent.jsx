@@ -2,6 +2,30 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 
+function tryParseDeployJson(text) {
+    if (!text) return null;
+    let cleanText = text.trim();
+    if (cleanText.startsWith('```json')) {
+        cleanText = cleanText.substring(7);
+    } else if (cleanText.startsWith('```')) {
+        cleanText = cleanText.substring(3);
+    }
+    if (cleanText.endsWith('```')) {
+        cleanText = cleanText.substring(0, cleanText.length - 3);
+    }
+    cleanText = cleanText.trim();
+
+    try {
+        const parsed = JSON.parse(cleanText);
+        if (parsed && (parsed.status === 'ready_to_deploy' || parsed.ready_to_deploy === true)) {
+            return parsed;
+        }
+    } catch (e) {
+        // Ignore parsing error
+    }
+    return null;
+}
+
 export default function Agent() {
     const [config, setConfig] = useState(null);
     const [systemPrompt, setSystemPrompt] = useState('');
@@ -47,8 +71,9 @@ export default function Agent() {
         const currentMsg = userMessage;
         setUserMessage('');
         
-        // Add to history
-        setChatHistory(prev => [...prev, { role: 'user', content: currentMsg }]);
+        // Construct the updated history array including user's new message
+        const updatedHistory = [...chatHistory, { role: 'user', content: currentMsg }];
+        setChatHistory(updatedHistory);
         setLoading(true);
 
         try {
@@ -56,8 +81,7 @@ export default function Agent() {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
-                    system_prompt: systemPrompt,
-                    message: currentMsg,
+                    messages: updatedHistory.map(h => ({ role: h.role, content: h.content })),
                     passkey: passkey
                 })
             });
@@ -65,14 +89,71 @@ export default function Agent() {
 
             if (res.status === 403) {
                 setChatHistory(prev => [...prev, { role: 'assistant', content: `Error: ${data.error || 'Akses ditolak.'}`, isError: true }]);
+                setLoading(false);
             } else if (data.success) {
-                setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
+                const deployData = tryParseDeployJson(data.response);
+                if (deployData) {
+                    // Inject deployment loading status inline to the chat log
+                    const deployMsg = { 
+                        role: 'assistant', 
+                        content: `⚡ AI Worker: Parameter lengkap terdeteksi. Memulai proses deployment otomatis...\n\n- Blueprint Key: ${deployData.service_key}\n- Durasi Sewa: ${deployData.durasi}\n- Subdomain / Slug: ${deployData.client_slug_request}\n- Target Telegram Chat ID: ${deployData.telegram_chat_id}\n\nSedang mereplikasi filesystem template dan mengeksekusi script deploy.sh pada VPS Laravel worker...`,
+                        isDeploying: true
+                    };
+                    setChatHistory(prev => [...prev, deployMsg]);
+                    setLoading(false);
+
+                    try {
+                        const deployRes = await fetch('/api/dashboard/agent/deploy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                service_key: deployData.service_key,
+                                durasi: deployData.durasi,
+                                client_slug_request: deployData.client_slug_request,
+                                telegram_token: deployData.telegram_token,
+                                telegram_chat_id: deployData.telegram_chat_id,
+                                price: deployData.price
+                            })
+                        });
+                        const deployResult = await deployRes.json();
+                        
+                        if (deployResult.success) {
+                            setChatHistory(prev => [
+                                ...prev.map(m => m.isDeploying ? {
+                                    role: 'assistant',
+                                    content: `🎉 Deployment sukses!\n\nInstansi untuk client '${deployData.client_slug_request}' berhasil dibuat.\nSemua script konfigurasi dijalankan dengan sukses dan reverse proxy telah terdaftar.`,
+                                    url: deployResult.url,
+                                    deployment: deployResult.deployment
+                                } : m)
+                            ]);
+                        } else {
+                            setChatHistory(prev => [
+                                ...prev.map(m => m.isDeploying ? {
+                                    role: 'assistant',
+                                    content: `❌ Deployment Gagal: ${deployResult.error || 'Gagal mengeksekusi deploy.sh pada VPS.'}`,
+                                    isError: true
+                                } : m)
+                            ]);
+                        }
+                    } catch (deployErr) {
+                        setChatHistory(prev => [
+                            ...prev.map(m => m.isDeploying ? {
+                                role: 'assistant',
+                                content: `❌ Gangguan Koneksi: Gagal berkomunikasi dengan API deployment server.`,
+                                isError: true
+                            } : m)
+                        ]);
+                    }
+                } else {
+                    setChatHistory(prev => [...prev, { role: 'assistant', content: data.response }]);
+                    setLoading(false);
+                }
             } else {
-                setChatHistory(prev => [...prev, { role: 'assistant', content: `Error: ${data.error || 'Failed to get response.'}`, isError: true }]);
+                setChatHistory(prev => [...prev, { role: 'assistant', content: `Error: ${data.error || 'Gagal mendapatkan respon AI.'}`, isError: true }]);
+                setLoading(false);
             }
         } catch (err) {
-            setChatHistory(prev => [...prev, { role: 'assistant', content: 'Error: Failed to connect to server API.', isError: true }]);
-        } finally {
+            setChatHistory(prev => [...prev, { role: 'assistant', content: 'Error: Gagal terhubung ke API server.', isError: true }]);
             setLoading(false);
         }
     };
@@ -169,6 +250,35 @@ export default function Agent() {
                                                     : 'bg-zinc-950 border-zinc-900 text-zinc-300'
                                         }`}>
                                             <p className="whitespace-pre-wrap">{msg.content}</p>
+
+                                            {msg.isDeploying && (
+                                                <div className="mt-3 flex items-center gap-2 border-t border-zinc-900 pt-3">
+                                                    <span className="animate-spin rounded-full h-3.5 w-3.5 border-t border-b border-white"></span>
+                                                    <span className="text-[10px] text-zinc-450 uppercase font-bold tracking-wider animate-pulse">
+                                                        VPS executing deploy.sh...
+                                                    </span>
+                                                </div>
+                                            )}
+
+                                            {msg.url && (
+                                                <div className="mt-3.5 p-3 bg-zinc-900 border border-zinc-800 rounded-lg flex flex-col gap-2 max-w-[280px] sm:max-w-xs md:max-w-sm">
+                                                    <div className="flex items-center gap-2">
+                                                        <span className="h-1.5 w-1.5 rounded-full bg-white animate-pulse"></span>
+                                                        <span className="text-[9px] text-white font-bold uppercase tracking-widest">Instance Live</span>
+                                                    </div>
+                                                    <a 
+                                                        href={msg.url} 
+                                                        target="_blank" 
+                                                        rel="noopener noreferrer" 
+                                                        className="inline-flex items-center justify-between bg-white text-black font-bold uppercase px-2.5 py-1.5 rounded hover:bg-zinc-200 transition-colors mt-1 font-mono text-[9px]"
+                                                    >
+                                                        <span className="truncate mr-1.5">{msg.url}</span>
+                                                        <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                                        </svg>
+                                                    </a>
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                 ))}

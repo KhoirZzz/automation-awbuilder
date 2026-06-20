@@ -166,16 +166,26 @@ You are a helpful assistant that can both process client deployment orders and a
    - Runs `teardown.sh` for expired instances, moves the directory to `storage/deployments_archive` (timestamped), and updates status to `expired`.
 
 === BEHAVIOR RULES ===
-- If the user asks to analyze a lead or place a deployment order, you must analyze it and extract the parameters in JSON format:
+- Greet your creator as 'Tuan Ridzz' or 'Ridzz'.
+- When the user asks to deploy a website/service, check if ALL the following required parameters are present:
+  1. `service_key` (must match one of active templates: [{$servicesList}])
+  2. `durasi` (must match one of [{$durationsList}])
+  3. `client_slug_request` (a suggested subdomain slug)
+  4. `telegram_token` (bot api token, e.g. 8698960345:AAEh...)
+  5. `telegram_chat_id` (user chat id, e.g. 7860981010)
+
+- If ANY of these parameters are missing, do NOT output a JSON. Instead, reply in polite Indonesian, greet the master, and ask for the missing parameters (e.g., "Tuan Ridzz, saya memerlukan Telegram Token dan Chat ID klien untuk melanjutkan...").
+- If ALL of these parameters are complete, you MUST output ONLY a raw JSON payload in this format (no markdown blocks, no conversational text before or after, just the raw JSON object):
 {
-  "service_key": "template-key",
+  "status": "ready_to_deploy",
+  "service_key": "service-key",
   "durasi": "duration-value",
-  "client_slug_request": "suggested-slug",
-  "telegram_token": "token-value-or-null",
-  "telegram_chat_id": "chat-id-value-or-null",
-  "price": "price-value-or-null"
+  "client_slug_request": "slug-value",
+  "telegram_token": "token-value",
+  "telegram_chat_id": "chat-id-value",
+  "price": 100000
 }
-- If the user chats with you or asks about the system structure, workflows, or rules, answer in a friendly, helpful, and professional manner, explaining how the components work together.
+- If the user chats about general topics, system structure, or workflows, answer in a friendly, helpful, and professional manner, explaining how the components work together.
 PROMPT;
     }
 
@@ -200,11 +210,11 @@ PROMPT;
      * Send a custom chat prompt to the LLM agent.
      *
      * @param string $systemPrompt
-     * @param string $userMessage
+     * @param array|string $messages
      * @return string
      * @throws HermesResponseException
      */
-    public function chat(string $systemPrompt, string $userMessage): string
+    public function chat(string $systemPrompt, array|string $messages): string
     {
         $apiUrl = env('HERMES_API_URL', 'http://localhost:11434/v1/chat/completions');
         $apiKey = env('HERMES_API_KEY');
@@ -217,21 +227,33 @@ PROMPT;
             $headers['Authorization'] = 'Bearer ' . $apiKey;
         }
 
+        $payloadMessages = [
+            [
+                'role' => 'system',
+                'content' => $systemPrompt
+            ]
+        ];
+
+        if (is_array($messages)) {
+            foreach ($messages as $msg) {
+                $payloadMessages[] = [
+                    'role' => $msg['role'] ?? 'user',
+                    'content' => $msg['content'] ?? ''
+                ];
+            }
+        } else {
+            $payloadMessages[] = [
+                'role' => 'user',
+                'content' => $messages
+            ];
+        }
+
         try {
             $response = Http::withHeaders($headers)
                 ->timeout(30)
                 ->post($apiUrl, [
                     'model' => $model,
-                    'messages' => [
-                        [
-                            'role' => 'system',
-                            'content' => $systemPrompt
-                        ],
-                        [
-                            'role' => 'user',
-                            'content' => $userMessage
-                        ]
-                    ],
+                    'messages' => $payloadMessages,
                     'temperature' => 0.7,
                     'stream' => false
                 ]);
