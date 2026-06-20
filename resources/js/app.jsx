@@ -7,7 +7,15 @@ import Sandbox from './views/Sandbox';
 import Agent from './views/Agent';
 
 function App() {
-    const [activeTab, setActiveTab] = useState('dashboard');
+    // Read the active tab from localStorage to persist navigation state on page refreshes
+    const [activeTab, setActiveTab] = useState(() => {
+        return localStorage.getItem('active_tab') || 'dashboard';
+    });
+
+    const handleTabChange = (tab) => {
+        setActiveTab(tab);
+        localStorage.setItem('active_tab', tab);
+    };
 
     const renderView = () => {
         switch (activeTab) {
@@ -52,7 +60,7 @@ function App() {
 
                 <nav className="flex flex-col gap-1.5">
                     <button
-                        onClick={() => setActiveTab('dashboard')}
+                        onClick={() => handleTabChange('dashboard')}
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded text-xs font-mono font-semibold uppercase tracking-wider transition-all ${
                             activeTab === 'dashboard'
                                 ? 'bg-zinc-900 text-white border border-zinc-800'
@@ -65,7 +73,7 @@ function App() {
                         <span>Dashboard</span>
                     </button>
                     <button
-                        onClick={() => setActiveTab('templates')}
+                        onClick={() => handleTabChange('templates')}
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded text-xs font-mono font-semibold uppercase tracking-wider transition-all ${
                             activeTab === 'templates'
                                 ? 'bg-zinc-900 text-white border border-zinc-800'
@@ -78,7 +86,7 @@ function App() {
                         <span>Templates</span>
                     </button>
                     <button
-                        onClick={() => setActiveTab('logs')}
+                        onClick={() => handleTabChange('logs')}
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded text-xs font-mono font-semibold uppercase tracking-wider transition-all ${
                             activeTab === 'logs'
                                 ? 'bg-zinc-900 text-white border border-zinc-800'
@@ -91,7 +99,7 @@ function App() {
                         <span>Audit Logs</span>
                     </button>
                     <button
-                        onClick={() => setActiveTab('sandbox')}
+                        onClick={() => handleTabChange('sandbox')}
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded text-xs font-mono font-semibold uppercase tracking-wider transition-all ${
                             activeTab === 'sandbox'
                                 ? 'bg-zinc-900 text-white border border-zinc-800'
@@ -104,7 +112,7 @@ function App() {
                         <span>Sandbox</span>
                     </button>
                     <button
-                        onClick={() => setActiveTab('agent')}
+                        onClick={() => handleTabChange('agent')}
                         className={`flex items-center gap-3 px-3.5 py-2.5 rounded text-xs font-mono font-semibold uppercase tracking-wider transition-all ${
                             activeTab === 'agent'
                                 ? 'bg-zinc-900 text-white border border-zinc-800'
@@ -130,7 +138,7 @@ function App() {
             {/* Bottom Nav Bar for Mobile/Tablet */}
             <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-zinc-950/95 backdrop-blur-md border-t border-zinc-900 flex justify-around py-3 px-2">
                 <button
-                    onClick={() => setActiveTab('dashboard')}
+                    onClick={() => handleTabChange('dashboard')}
                     className={`flex flex-col items-center gap-1.5 text-[9px] font-mono font-semibold uppercase tracking-wider transition-colors ${
                         activeTab === 'dashboard' ? 'text-white' : 'text-zinc-650 hover:text-zinc-400'
                     }`}
@@ -141,7 +149,7 @@ function App() {
                     <span>Status</span>
                 </button>
                 <button
-                    onClick={() => setActiveTab('templates')}
+                    onClick={() => handleTabChange('templates')}
                     className={`flex flex-col items-center gap-1.5 text-[9px] font-mono font-semibold uppercase tracking-wider transition-colors ${
                         activeTab === 'templates' ? 'text-white' : 'text-zinc-650 hover:text-zinc-400'
                     }`}
@@ -152,7 +160,7 @@ function App() {
                     <span>Templates</span>
                 </button>
                 <button
-                    onClick={() => setActiveTab('logs')}
+                    onClick={() => handleTabChange('logs')}
                     className={`flex flex-col items-center gap-1.5 text-[9px] font-mono font-semibold uppercase tracking-wider transition-colors ${
                         activeTab === 'logs' ? 'text-white' : 'text-zinc-650 hover:text-zinc-400'
                     }`}
@@ -163,7 +171,7 @@ function App() {
                     <span>Logs</span>
                 </button>
                 <button
-                    onClick={() => setActiveTab('sandbox')}
+                    onClick={() => handleTabChange('sandbox')}
                     className={`flex flex-col items-center gap-1.5 text-[9px] font-mono font-semibold uppercase tracking-wider transition-colors ${
                         activeTab === 'sandbox' ? 'text-white' : 'text-zinc-650 hover:text-zinc-400'
                     }`}
@@ -174,7 +182,7 @@ function App() {
                     <span>Sandbox</span>
                 </button>
                 <button
-                    onClick={() => setActiveTab('agent')}
+                    onClick={() => handleTabChange('agent')}
                     className={`flex flex-col items-center gap-1.5 text-[9px] font-mono font-semibold uppercase tracking-wider transition-colors ${
                         activeTab === 'agent' ? 'text-white' : 'text-zinc-650 hover:text-zinc-400'
                     }`}
