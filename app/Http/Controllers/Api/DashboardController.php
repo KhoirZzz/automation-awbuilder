@@ -73,6 +73,7 @@ class DashboardController extends Controller
         $validated = $request->validate([
             'key' => 'required|string|unique:service_templates,key',
             'name' => 'required|string',
+            'category' => 'nullable|string',
             'template_path' => 'required|string',
             'is_active' => 'boolean',
         ]);
@@ -479,6 +480,7 @@ class DashboardController extends Controller
             'filename' => 'required|string',
             'key' => 'required|string|unique:service_templates,key|regex:/^[a-z0-9-]+$/',
             'name' => 'required|string',
+            'category' => 'nullable|string',
         ]);
 
         $filename = basename($validated['filename']); // Prevent directory traversal
@@ -517,6 +519,7 @@ class DashboardController extends Controller
             $template = ServiceTemplate::create([
                 'key' => $validated['key'],
                 'name' => $validated['name'],
+                'category' => $validated['category'] ?? null,
                 'template_path' => $validated['key'],
                 'is_active' => true
             ]);

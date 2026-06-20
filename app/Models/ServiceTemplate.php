@@ -13,6 +13,7 @@ class ServiceTemplate extends Model
     protected $fillable = [
         'key',
         'name',
+        'category',
         'template_path',
         'is_active',
     ];

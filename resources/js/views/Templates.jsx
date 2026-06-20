@@ -13,6 +13,7 @@ export default function Templates() {
     // Manual template form states
     const [newKey, setNewKey] = useState('');
     const [newName, setNewName] = useState('');
+    const [newCategory, setNewCategory] = useState('');
     const [newPath, setNewPath] = useState('');
     const [newIsActive, setNewIsActive] = useState(true);
 
@@ -23,6 +24,7 @@ export default function Templates() {
     // Extraction form states (keyed by zip filename)
     const [extractionKeys, setExtractionKeys] = useState({});
     const [extractionNames, setExtractionNames] = useState({});
+    const [extractionCategories, setExtractionCategories] = useState({});
 
     // Hold-to-extract state
     const [holdingZip, setHoldingZip] = useState(null);
@@ -80,6 +82,7 @@ export default function Templates() {
                 body: JSON.stringify({
                     key: newKey,
                     name: newName,
+                    category: newCategory,
                     template_path: newPath,
                     is_active: newIsActive
                 })
@@ -93,6 +96,7 @@ export default function Templates() {
                 setModalOpen(false);
                 setNewKey('');
                 setNewName('');
+                setNewCategory('');
                 setNewPath('');
                 fetchTemplates();
             }
@@ -140,6 +144,7 @@ export default function Templates() {
     const startHold = (zipFilename) => {
         const key = (extractionKeys[zipFilename] || '').trim();
         const name = (extractionNames[zipFilename] || '').trim();
+        const category = (extractionCategories[zipFilename] || '').trim();
 
         if (!key || !name) {
             alert('Silakan isi Template Key dan Display Name terlebih dahulu.');
@@ -174,14 +179,14 @@ export default function Templates() {
         setHoldProgress(0);
     };
 
-    const triggerExtraction = async (filename, key, name) => {
+    const triggerExtraction = async (filename, key, name, category) => {
         stopHold();
         setLoading(true);
         try {
             const res = await fetch('/api/dashboard/templates/extract-zip', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename, key, name })
+                body: JSON.stringify({ filename, key, name, category })
             });
             const data = await res.json();
 
@@ -193,6 +198,11 @@ export default function Templates() {
                     return next;
                 });
                 setExtractionNames(prev => {
+                    const next = { ...prev };
+                    delete next[filename];
+                    return next;
+                });
+                setExtractionCategories(prev => {
                     const next = { ...prev };
                     delete next[filename];
                     return next;
@@ -224,6 +234,16 @@ export default function Templates() {
         );
     }
 
+    // Group templates by category
+    const groupedTemplates = templates.reduce((groups, tpl) => {
+        const cat = (tpl.category || 'UNCATEGORIZED').toUpperCase().trim();
+        if (!groups[cat]) {
+            groups[cat] = [];
+        }
+        groups[cat].push(tpl);
+        return groups;
+    }, {});
+
     return (
         <div className="space-y-10 font-mono text-xs">
             {/* Header section */}
@@ -237,39 +257,52 @@ export default function Templates() {
                 </Button>
             </div>
 
-            {/* Template list Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {templates.map((tpl) => (
-                    <Card 
-                        key={tpl.id} 
-                        title={tpl.name}
-                        action={
-                            <Badge variant={tpl.is_active ? 'success' : 'neutral'}>
-                                {tpl.is_active ? 'Active' : 'Inactive'}
-                            </Badge>
-                        }
-                    >
-                        <div className="space-y-4">
-                            <div>
-                                <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider block">Service Slug Key</span>
-                                <span className="text-zinc-300 font-mono text-xs font-bold">{tpl.key}</span>
-                            </div>
-                            <div>
-                                <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider block">Template Folder Name</span>
-                                <span className="text-zinc-300 font-mono text-xs">{tpl.template_path}</span>
-                            </div>
-                            <div className="pt-4 border-t border-zinc-900 flex items-center justify-between">
-                                <span className="text-zinc-500 text-xs">LLM Active?</span>
-                                <Button 
-                                    size="sm" 
-                                    variant={tpl.is_active ? 'secondary' : 'success'}
-                                    onClick={() => handleToggle(tpl.id)}
-                                >
-                                    {tpl.is_active ? 'Deactivate' : 'Activate'}
-                                </Button>
-                            </div>
+            {/* Template list Grouped by Categories */}
+            <div className="space-y-10">
+                {Object.keys(groupedTemplates).map((catName) => (
+                    <div key={catName} className="space-y-4">
+                        <div className="flex items-center gap-3">
+                            <span className="h-px bg-zinc-800 flex-1"></span>
+                            <h2 className="text-[10px] font-bold text-zinc-400 tracking-widest uppercase font-mono px-3.5 py-1 bg-zinc-950 border border-zinc-900 rounded">
+                                {catName}
+                            </h2>
+                            <span className="h-px bg-zinc-800 flex-1"></span>
                         </div>
-                    </Card>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {groupedTemplates[catName].map((tpl) => (
+                                <Card 
+                                    key={tpl.id} 
+                                    title={tpl.name}
+                                    action={
+                                        <Badge variant={tpl.is_active ? 'success' : 'neutral'}>
+                                            {tpl.is_active ? 'Active' : 'Inactive'}
+                                        </Badge>
+                                    }
+                                >
+                                    <div className="space-y-4">
+                                        <div>
+                                            <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider block">Service Slug Key</span>
+                                            <span className="text-zinc-300 font-mono text-xs font-bold">{tpl.key}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider block">Template Folder Name</span>
+                                            <span className="text-zinc-300 font-mono text-xs">{tpl.template_path}</span>
+                                        </div>
+                                        <div className="pt-4 border-t border-zinc-900 flex items-center justify-between">
+                                            <span className="text-zinc-500 text-xs">LLM Active?</span>
+                                            <Button 
+                                                size="sm" 
+                                                variant={tpl.is_active ? 'secondary' : 'success'}
+                                                onClick={() => handleToggle(tpl.id)}
+                                            >
+                                                {tpl.is_active ? 'Deactivate' : 'Activate'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
                 ))}
             </div>
 
@@ -356,7 +389,7 @@ export default function Templates() {
                                                         const val = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
                                                         setExtractionKeys(prev => ({ ...prev, [zip.filename]: val }));
                                                     }}
-                                                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-2 text-white placeholder-zinc-700 focus:outline-none w-full sm:w-36"
+                                                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-2 text-white placeholder-zinc-700 focus:outline-none w-full sm:w-32"
                                                 />
                                                 <input
                                                     type="text"
@@ -367,7 +400,17 @@ export default function Templates() {
                                                         const val = e.target.value;
                                                         setExtractionNames(prev => ({ ...prev, [zip.filename]: val }));
                                                     }}
-                                                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-2 text-white placeholder-zinc-700 focus:outline-none w-full sm:w-44"
+                                                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-2 text-white placeholder-zinc-700 focus:outline-none w-full sm:w-36"
+                                                />
+                                                <input
+                                                    type="text"
+                                                    placeholder="Category"
+                                                    value={extractionCategories[zip.filename] || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value.toUpperCase();
+                                                        setExtractionCategories(prev => ({ ...prev, [zip.filename]: val }));
+                                                    }}
+                                                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-2 text-white placeholder-zinc-700 focus:outline-none w-full sm:w-28"
                                                 />
 
                                                 {/* Hold-to-Extract Button */}
@@ -377,7 +420,7 @@ export default function Templates() {
                                                     onMouseLeave={stopHold}
                                                     onTouchStart={() => startHold(zip.filename)}
                                                     onTouchEnd={stopHold}
-                                                    className="relative select-none overflow-hidden inline-flex items-center justify-center font-bold rounded-lg border border-white text-xs bg-white text-black active:scale-[0.98] transition-transform duration-100 h-9 w-full sm:w-40"
+                                                    className="relative select-none overflow-hidden inline-flex items-center justify-center font-bold rounded-lg border border-white text-xs bg-white text-black active:scale-[0.98] transition-transform duration-100 h-9 w-full sm:w-32"
                                                 >
                                                     {/* Progress bar background fill */}
                                                     {holdingZip === zip.filename && (
@@ -432,6 +475,16 @@ export default function Templates() {
                             placeholder="e.g. Shopee Auto Bot"
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-650 focus:outline-none focus:border-zinc-500"
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <label className="block font-semibold text-zinc-400 uppercase">Category Group</label>
+                        <input
+                            type="text"
+                            placeholder="e.g. SHOPEE, GOJEK, GRAB, AGODA"
+                            value={newCategory}
+                            onChange={(e) => setNewCategory(e.target.value.toUpperCase())}
                             className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-650 focus:outline-none focus:border-zinc-500"
                         />
                     </div>
