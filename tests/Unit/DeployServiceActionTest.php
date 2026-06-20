@@ -81,7 +81,7 @@ class DeployServiceActionTest extends TestCase
             duration: ServiceDuration::ONE_WEEK,
             clientSlug: 'my-bot',
             expiresAt: now()->addWeek(),
-            source: 'telegram',
+            source: 'agent',
             leadReference: 'tg_123',
             price: 100000,
             rawLlmResponse: '{"service_key":"shopee-bot"}'
@@ -107,6 +107,30 @@ class DeployServiceActionTest extends TestCase
             return str_contains($process->command[1], 'deploy.sh')
                 && $process->command[2] === 'my-bot';
         });
+    }
+
+    public function test_deploy_service_action_pending_payment(): void
+    {
+        Process::fake([
+            '*' => Process::result('Success Output', '', 0),
+        ]);
+
+        $result = new LeadAnalysisResult(
+            serviceTemplateId: $this->template->id,
+            duration: ServiceDuration::ONE_WEEK,
+            clientSlug: 'my-payment-bot',
+            expiresAt: now()->addWeek(),
+            source: 'telegram',
+            leadReference: 'tg_456',
+            price: 100000,
+            rawLlmResponse: '{"service_key":"shopee-bot"}'
+        );
+
+        $action = new DeployServiceAction();
+        $deployment = $action->execute($result);
+
+        $this->assertEquals(DeploymentStatus::PENDING_PAYMENT, $deployment->status);
+        $this->assertTrue(File::isDirectory($this->testInstanceBase . '/my-payment-bot'));
     }
 
     public function test_deploy_service_action_failure_rolls_back(): void

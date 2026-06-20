@@ -176,19 +176,25 @@ class DeployServiceAction
             }
 
             // 5. Success finalization
+            $finalStatus = ($result->source === 'telegram') ? DeploymentStatus::PENDING_PAYMENT : DeploymentStatus::ACTIVE;
             $deployment->update([
-                'status' => DeploymentStatus::ACTIVE,
+                'status' => $finalStatus,
             ]);
 
             Log::channel('deploy-audit')->info('Deployment completed successfully.', [
                 'deployment_id' => $deployment->id,
-                'client_slug' => $result->clientSlug
+                'client_slug' => $result->clientSlug,
+                'status' => $finalStatus->value
             ]);
+
+            $cacheMessage = ($finalStatus === DeploymentStatus::PENDING_PAYMENT)
+                ? 'Deployment built successfully. Awaiting payment confirmation.'
+                : 'Deployment active and running successfully.';
 
             Cache::put("sandbox_status_{$result->leadReference}", [
                 'stage' => 'completed',
-                'status' => 'active',
-                'message' => 'Deployment active and running successfully.'
+                'status' => $finalStatus->value,
+                'message' => $cacheMessage
             ], 600);
 
             return $deployment;

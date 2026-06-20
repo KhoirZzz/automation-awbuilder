@@ -88,6 +88,25 @@ export default function Dashboard() {
         }
     };
 
+    const handleApprovePayment = async (id) => {
+        if (!confirm('Verify payment proof and approve this deployment?')) return;
+        setActionLoading(id);
+        try {
+            const res = await fetch(`/api/dashboard/deployments/${id}/approve`, { method: 'POST' });
+            const data = await res.json();
+            if (data.error) {
+                showBanner('error', data.error);
+            } else {
+                showBanner('success', 'Deployment approved. Client notified.');
+                loadData();
+            }
+        } catch (e) {
+            showBanner('error', 'Approval API connection failed.');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     const handleExtendSubmit = async () => {
         if (!selectedDeployment) return;
         setLoading(true);
@@ -116,6 +135,7 @@ export default function Dashboard() {
         switch (status) {
             case 'active': return 'success';
             case 'pending': return 'warning';
+            case 'pending_payment': return 'warning';
             case 'expired': return 'neutral';
             case 'failed': return 'danger';
             default: return 'neutral';
@@ -307,6 +327,17 @@ export default function Dashboard() {
                                             Retry
                                         </Button>
                                     )}
+                                    {dep.status === 'pending_payment' && (
+                                        <Button 
+                                            size="sm" 
+                                            variant="success"
+                                            className="w-full"
+                                            loading={actionLoading === dep.id}
+                                            onClick={() => handleApprovePayment(dep.id)}
+                                        >
+                                            Approve Payment
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         ))
@@ -399,6 +430,16 @@ export default function Dashboard() {
                                                         onClick={() => handleRetry(dep.id)}
                                                     >
                                                         Retry
+                                                    </Button>
+                                                )}
+                                                {dep.status === 'pending_payment' && (
+                                                    <Button 
+                                                        size="sm" 
+                                                        variant="success"
+                                                        loading={actionLoading === dep.id}
+                                                        onClick={() => handleApprovePayment(dep.id)}
+                                                    >
+                                                        Approve Payment
                                                     </Button>
                                                 )}
                                             </div>

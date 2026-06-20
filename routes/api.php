@@ -28,6 +28,7 @@ Route::prefix('/dashboard')->group(function () {
     Route::post('/deployments/{id}/teardown', [DashboardController::class, 'teardown']);
     Route::post('/deployments/{id}/extend', [DashboardController::class, 'extend']);
     Route::post('/deployments/{id}/retry', [DashboardController::class, 'retry']);
+    Route::post('/deployments/{id}/approve', [DashboardController::class, 'approve']);
     Route::get('/logs', [DashboardController::class, 'logs']);
     Route::post('/sandbox/test', [DashboardController::class, 'sandboxTest']);
     Route::get('/sandbox/status/{lead_reference}', [DashboardController::class, 'sandboxStatus']);

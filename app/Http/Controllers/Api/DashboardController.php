@@ -199,6 +199,44 @@ class DashboardController extends Controller
     }
 
     /**
+     * Approve payment for a deployment pending payment.
+     */
+    public function approve($id, \App\Services\TelegramBotService $botService): JsonResponse
+    {
+        $deployment = Deployment::findOrFail($id);
+
+        if ($deployment->status !== DeploymentStatus::PENDING_PAYMENT) {
+            return response()->json(['error' => 'Only deployments pending payment can be approved.'], 400);
+        }
+
+        $deployment->update(['status' => DeploymentStatus::ACTIVE]);
+
+        // Construct final URL
+        $baseDomain = 'mockbuild.shop';
+        $host = request()->getHost();
+        if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $host)) {
+            $baseDomain = $host;
+        }
+        $clientUrl = "http://{$deployment->client_slug}.{$baseDomain}";
+
+        // Notify user if Telegram ID is in lead_reference
+        if (str_starts_with($deployment->lead_reference, 'tg_')) {
+            $parts = explode('_', $deployment->lead_reference);
+            $clientChatId = $parts[1] ?? null;
+
+            if ($clientChatId) {
+                $botService->sendMessage($clientChatId, "✅ <b>PEMBAYARAN DITERIMA!</b>\n\nTerima kasih, pembayaran Anda telah diverifikasi oleh Admin.\nAplikasi Anda telah aktif sepenuhnya.\n\n<b>Link Tautan:</b> <a href=\"{$clientUrl}\">{$clientUrl}</a>");
+            }
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Deployment approved and client notified.',
+            'url' => $clientUrl
+        ]);
+    }
+
+    /**
      * Read the latest deploy-audit logs.
      */
     public function logs(): JsonResponse
@@ -554,7 +592,7 @@ class DashboardController extends Controller
             duration: $durationEnum,
             clientSlug: $clientSlug,
             expiresAt: $durationEnum->calculateExpiry(),
-            source: 'telegram',
+            source: 'agent',
             leadReference: 'agent_' . time() . '_' . rand(100, 999),
             price: $price,
             rawLlmResponse: json_encode($validated)

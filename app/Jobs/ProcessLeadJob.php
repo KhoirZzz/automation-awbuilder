@@ -47,12 +47,20 @@ class ProcessLeadJob implements ShouldQueue
     public function handle(
         HermesService $hermesService,
         LeadAnalysisValidator $validator,
-        DeployServiceAction $deployAction
+        DeployServiceAction $deployAction,
+        \App\Services\TelegramBotService $botService
     ): void {
         Log::channel('deploy-audit')->info('Processing lead job.', [
             'lead_reference' => $this->leadReference,
             'source' => $this->source,
         ]);
+
+        // Extract Telegram chat ID from lead reference if applicable
+        $chatId = null;
+        if (str_starts_with($this->leadReference, 'tg_')) {
+            $parts = explode('_', $this->leadReference);
+            $chatId = $parts[1] ?? null;
+        }
 
         // Start stage: llm_analysis
         Cache::put("sandbox_status_{$this->leadReference}", [
@@ -108,12 +116,32 @@ class ProcessLeadJob implements ShouldQueue
                 'message' => 'Lead rejected due to validation failure: ' . $e->getMessage()
             ], 600);
 
+            if ($chatId) {
+                $botService->sendMessage($chatId, "❌ <b>Pemesanan Gagal</b>\n\nMaaf, pesanan Anda tidak dapat diproses karena kesalahan berikut:\n<i>" . $e->getMessage() . "</i>");
+            }
+
             return;
         }
 
         try {
             // Execute the deployment action
             $deployAction->execute($analysisResult);
+
+            // Send QRIS invoice and notify admin if ordered via Telegram bot
+            if ($this->source === 'telegram' && $chatId) {
+                $qrisUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=qris_payment_mock_" . $analysisResult->clientSlug;
+                $formattedPrice = $analysisResult->price ? 'Rp ' . number_format($analysisResult->price, 0, ',', '.') : 'Rp 100.000';
+                
+                $caption = "<b>📄 INVOICE PEMESANAN DEPLOYMENT</b>\n\nAplikasi Anda berhasil dikonfigurasi di VPS dan siap diaktifkan!\n\n• <b>Subdomain / Slug:</b> {$analysisResult->clientSlug}\n• <b>Durasi Sewa:</b> {$analysisResult->duration->value}\n• <b>Total Pembayaran:</b> {$formattedPrice}\n\nSilakan scan QRIS di atas untuk melakukan pembayaran.\nKirimkan bukti transfer pembayaran Anda ke Admin: <b>@awbuilderadmin</b>.\n\n<i>Aplikasi Anda akan segera diaktifkan dan link URL akan dikirim ke chat ini setelah pembayaran diverifikasi oleh Admin.</i>";
+                
+                $botService->sendPhoto($chatId, $qrisUrl, $caption);
+
+                // Notify admin
+                $adminChatId = env('TELEGRAM_ADMIN_CHAT_ID');
+                if ($adminChatId) {
+                    $botService->sendMessage($adminChatId, "<b>🔔 PEMESANAN BARU MENUNGGU PERSETUJUAN</b>\n\n• Client Chat ID: <code>{$chatId}</code>\n• Subdomain: <b>{$analysisResult->clientSlug}</b>\n• Durasi Sewa: <b>{$analysisResult->duration->value}</b>\n• Harga: <b>{$formattedPrice}</b>\n\nSilakan verifikasi bukti pembayaran dari client di @awbuilderadmin lalu ketik:\n<code>/approve {$analysisResult->clientSlug}</code>");
+                }
+            }
         } catch (Throwable $e) {
             // Execution/script/filesystem error is generally non-transient unless filesystem/disk is full,
             // but the state has been rolled back. We log and complete the job.
@@ -122,6 +150,10 @@ class ProcessLeadJob implements ShouldQueue
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString()
             ]);
+
+            if ($chatId) {
+                $botService->sendMessage($chatId, "❌ <b>Pemesanan Gagal</b>\n\nTerjadi kesalahan teknis saat melakukan deployment di VPS. Silakan hubungi admin kami untuk pengecekan manual.");
+            }
             // Do not re-throw to avoid infinite retries on static script failures
         }
     }
