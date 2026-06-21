@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { Alert } from '../components/Alert';
 
 const STAGES = [
     { key: 'webhook', label: '1. Webhook Payload Received', desc: 'Simulated WhatsApp/Telegram webhook event registered.' },
@@ -18,6 +19,86 @@ export default function Sandbox() {
     const [leadRef, setLeadRef] = useState(null);
     const [currentStatus, setCurrentStatus] = useState(null); // { stage, status, message, deployment }
     const [logs, setLogs] = useState('');
+
+    // Alert state
+    const [alert, setAlert] = useState(null); // { type, message }
+
+    // Manual Form states
+    const [templates, setTemplates] = useState([]);
+    const [serviceKey, setServiceKey] = useState('');
+    const [durasi, setDurasi] = useState('1_minggu');
+    const [clientSlug, setClientSlug] = useState('');
+    const [telegramToken, setTelegramToken] = useState('');
+    const [telegramChatId, setTelegramChatId] = useState('');
+    const [price, setPrice] = useState('');
+
+    // Fetch active templates
+    useEffect(() => {
+        const fetchTemplates = async () => {
+            try {
+                const res = await fetch('/api/dashboard/templates');
+                const data = await res.json();
+                const active = data.filter(t => t.is_active);
+                setTemplates(active);
+                if (active.length > 0) {
+                    setServiceKey(active[0].key);
+                }
+            } catch (e) {
+                console.error('Error fetching templates', e);
+            }
+        };
+        fetchTemplates();
+    }, []);
+
+    const handleManualDeploy = async (e) => {
+        e.preventDefault();
+        
+        if (!serviceKey) {
+            setAlert({ type: 'error', message: 'Kategori/Template harus dipilih.' });
+            return;
+        }
+
+        const cleanSlug = clientSlug.trim().toLowerCase();
+        if (!cleanSlug) {
+            setAlert({ type: 'error', message: 'Subdomain / Slug harus diisi.' });
+            return;
+        }
+
+        setLoading(true);
+        setLeadRef(null);
+        setCurrentStatus(null);
+        setAlert(null);
+        setLogs('Queuing manual deployment event to database queue... awaiting worker execution.');
+
+        try {
+            const res = await fetch('/api/dashboard/sandbox/manual-deploy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    service_key: serviceKey,
+                    durasi: durasi,
+                    client_slug_request: cleanSlug,
+                    telegram_token: telegramToken,
+                    telegram_chat_id: telegramChatId,
+                    price: price ? parseFloat(price) : null
+                })
+            });
+            const data = await res.json();
+            
+            if (data.success) {
+                setLeadRef(data.lead_reference);
+                setAlert({ type: 'success', message: 'Deployment manual berhasil dimasukkan ke sandbox queue! Memulai proses...' });
+            } else {
+                setAlert({ type: 'error', message: data.error || 'Gagal mengirim konfigurasi deployment.' });
+                setLogs('Failed to queue manual deployment: ' + (data.error || 'Unknown error'));
+                setLoading(false);
+            }
+        } catch (err) {
+            setAlert({ type: 'error', message: 'Gagal menghubungi API server.' });
+            setLogs('Failed to communicate with API.');
+            setLoading(false);
+        }
+    };
     
     // Status polling interval
     useEffect(() => {
@@ -56,6 +137,7 @@ export default function Sandbox() {
         setLoading(true);
         setLeadRef(null);
         setCurrentStatus(null);
+        setAlert(null);
         setLogs('Dispatched webhook event to database queue... awaiting worker execution.');
 
         try {
@@ -154,9 +236,19 @@ export default function Sandbox() {
                 <p className="text-zinc-500 text-xs mt-1">Test the LLM parser, DNS policies, templates replication, and process hooks.</p>
             </div>
 
+            {alert && (
+                <div className="max-w-xl">
+                    <Alert
+                        type={alert.type}
+                        message={alert.message}
+                        onClose={() => setAlert(null)}
+                    />
+                </div>
+            )}
+
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
                 {/* Form Control */}
-                <div className="lg:col-span-4">
+                <div className="lg:col-span-4 space-y-6">
                     <Card title="Trigger Webhook Event">
                         <form onSubmit={handleSimulate} className="space-y-5 text-xs">
                             <div className="space-y-2">
@@ -209,6 +301,95 @@ export default function Sandbox() {
 
                             <Button type="submit" variant="primary" loading={loading} className="w-full uppercase font-semibold text-xs tracking-wider">
                                 Dispatch Event
+                            </Button>
+                        </form>
+                    </Card>
+
+                    <Card title="Manual Deployment Form">
+                        <form onSubmit={handleManualDeploy} className="space-y-4 text-xs">
+                            <div className="space-y-1">
+                                <label className="block font-semibold text-zinc-400 uppercase">Kategori / Blueprint</label>
+                                <select
+                                    value={serviceKey}
+                                    onChange={(e) => setServiceKey(e.target.value)}
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white focus:outline-none focus:border-zinc-500 font-mono"
+                                >
+                                    {templates.length === 0 ? (
+                                        <option value="">No templates available</option>
+                                    ) : (
+                                        templates.map((t) => (
+                                            <option key={t.key} value={t.key}>
+                                                {t.name} ({t.key})
+                                            </option>
+                                        ))
+                                    )}
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block font-semibold text-zinc-400 uppercase">Durasi Sewa</label>
+                                <select
+                                    value={durasi}
+                                    onChange={(e) => setDurasi(e.target.value)}
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white focus:outline-none focus:border-zinc-500 font-mono"
+                                >
+                                    <option value="1_minggu">1 Minggu</option>
+                                    <option value="1_bulan">1 Bulan</option>
+                                    <option value="3_bulan">3 Bulan</option>
+                                    <option value="6_bulan">6 Bulan</option>
+                                    <option value="1_tahun">1 Tahun</option>
+                                </select>
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block font-semibold text-zinc-400 uppercase">Subdomain / Slug</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={clientSlug}
+                                    onChange={(e) => setClientSlug(e.target.value)}
+                                    placeholder="e.g. tokoku"
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block font-semibold text-zinc-400 uppercase">Token Bot Telegram</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={telegramToken}
+                                    onChange={(e) => setTelegramToken(e.target.value)}
+                                    placeholder="e.g. 123456:ABC-DEF..."
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block font-semibold text-zinc-400 uppercase">Chat ID Telegram</label>
+                                <input
+                                    type="text"
+                                    required
+                                    value={telegramChatId}
+                                    onChange={(e) => setTelegramChatId(e.target.value)}
+                                    placeholder="e.g. 987654321"
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
+                                />
+                            </div>
+
+                            <div className="space-y-1">
+                                <label className="block font-semibold text-zinc-400 uppercase">Harga (Rupiah)</label>
+                                <input
+                                    type="number"
+                                    value={price}
+                                    onChange={(e) => setPrice(e.target.value)}
+                                    placeholder="e.g. 150000"
+                                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
+                                />
+                            </div>
+
+                            <Button type="submit" variant="primary" loading={loading} className="w-full uppercase font-semibold text-xs tracking-wider">
+                                Launch Sandbox Deploy
                             </Button>
                         </form>
                     </Card>

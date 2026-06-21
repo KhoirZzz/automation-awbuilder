@@ -329,6 +329,38 @@ class DashboardController extends Controller
         ]);
     }
 
+    /**
+     * Run a manual deployment simulation on the sandbox.
+     */
+    public function sandboxManualDeploy(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'service_key' => 'required|string',
+            'durasi' => 'required|string',
+            'client_slug_request' => 'required|string',
+            'telegram_token' => 'required|string',
+            'telegram_chat_id' => 'required|string',
+            'price' => 'nullable|numeric',
+        ]);
+
+        $leadRef = 'sandbox_manual_' . time() . '_' . rand(100, 999);
+
+        // Pre-initialize cache for polling feedback
+        \Illuminate\Support\Facades\Cache::put("sandbox_status_{$leadRef}", [
+            'stage' => 'webhook',
+            'status' => 'success',
+            'message' => 'Manual Deploy request received.'
+        ], 600);
+
+        \App\Jobs\ProcessManualDeployJob::dispatch($validated, $leadRef);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Manual deployment job queued.',
+            'lead_reference' => $leadRef
+        ]);
+    }
+
     public function sandboxStatus($leadReference): JsonResponse
     {
         $deployment = Deployment::where('lead_reference', $leadReference)->first();
@@ -872,7 +904,7 @@ class DashboardController extends Controller
         }
 
         // Map duration enum
-        $durationEnum = \App\Enums\ServiceDuration::fromValue($validated['durasi']);
+        $durationEnum = \App\Enums\ServiceDuration::tryFrom($validated['durasi']);
         if (!$durationEnum) {
             return response()->json(['success' => false, 'error' => 'Durasi tidak valid.'], 400);
         }

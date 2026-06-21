@@ -32,6 +32,7 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::post('/deployments/{id}/approve', [DashboardController::class, 'approve']);
     Route::get('/logs', [DashboardController::class, 'logs']);
     Route::post('/sandbox/test', [DashboardController::class, 'sandboxTest']);
+    Route::post('/sandbox/manual-deploy', [DashboardController::class, 'sandboxManualDeploy']);
     Route::get('/sandbox/status/{lead_reference}', [DashboardController::class, 'sandboxStatus']);
     Route::get('/agent/config', [DashboardController::class, 'getAgentConfig']);
     Route::post('/agent/chat', [DashboardController::class, 'agentChat']);
