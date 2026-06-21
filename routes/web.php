@@ -13,13 +13,13 @@ if (app()->runningUnitTests()) {
 Route::group(['domain' => 'admin.' . $routeDomain], function () {
     Route::get('/{any?}', function () {
         return view('welcome');
-    })->where('any', '^(?!api\/).*$');
+    })->where('any', '(?!api/).*');
 });
 
 Route::group(['domain' => 'dashboard.' . $routeDomain], function () {
     Route::get('/{any?}', function () {
         return view('welcome');
-    })->where('any', '^(?!api\/).*$');
+    })->where('any', '(?!api/).*');
 });
 
 // 2. Wildcard client subdomains dynamically proxied
