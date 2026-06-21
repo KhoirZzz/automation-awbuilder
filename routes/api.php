@@ -50,5 +50,12 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::post('/templates/file', [DashboardController::class, 'createFileOrFolder']);
     Route::put('/templates/file', [DashboardController::class, 'updateFileContent']);
     Route::delete('/templates/file', [DashboardController::class, 'deleteFileOrFolder']);
+
+    // Deployed Instances File Manager
+    Route::get('/deployments/files', [DashboardController::class, 'listDeploymentFiles']);
+    Route::get('/deployments/file/content', [DashboardController::class, 'getDeploymentFileContent']);
+    Route::post('/deployments/file', [DashboardController::class, 'createDeploymentFileOrFolder']);
+    Route::put('/deployments/file', [DashboardController::class, 'updateDeploymentFileContent']);
+    Route::delete('/deployments/file', [DashboardController::class, 'deleteDeploymentFileOrFolder']);
 });
 
