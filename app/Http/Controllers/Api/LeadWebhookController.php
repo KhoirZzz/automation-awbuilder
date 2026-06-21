@@ -66,7 +66,7 @@ class LeadWebhookController extends Controller
             $baseDomain = 'mockbuild.shop';
             $host = $request->getHost();
             if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $host)) {
-                $baseDomain = $host;
+                $baseDomain = preg_replace('/^(admin|dashboard|www|api)\./i', '', $host);
             }
             $clientUrl = "http://{$deployment->client_slug}.{$baseDomain}";
 
