@@ -11,7 +11,7 @@ const getDeploymentUrl = (clientSlug) => {
     return `http://${clientSlug}.${baseDomain}`;
 };
 
-export default function Dashboard() {
+export default function Dashboard({ onTriggerAgentEdit }) {
     const [stats, setStats] = useState(null);
     const [deployments, setDeployments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -314,6 +314,14 @@ export default function Dashboard() {
                                             <Button 
                                                 size="sm" 
                                                 variant="secondary"
+                                                className="flex-1 font-semibold"
+                                                onClick={() => onTriggerAgentEdit && onTriggerAgentEdit(dep.client_slug)}
+                                            >
+                                                Edit Code
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="secondary"
                                                 className="flex-1"
                                                 onClick={() => {
                                                     setSelectedDeployment(dep);
@@ -432,6 +440,14 @@ export default function Dashboard() {
                                             <div className="flex items-center justify-end gap-2.5">
                                                 {dep.status === 'active' && (
                                                     <>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="secondary"
+                                                            className="font-semibold"
+                                                            onClick={() => onTriggerAgentEdit && onTriggerAgentEdit(dep.client_slug)}
+                                                        >
+                                                            Edit Code
+                                                        </Button>
                                                         <Button 
                                                             size="sm" 
                                                             variant="secondary"

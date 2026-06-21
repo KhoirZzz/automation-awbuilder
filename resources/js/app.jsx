@@ -44,6 +44,13 @@ function App() {
         return localStorage.getItem('app_theme') || 'nihilist';
     });
 
+    const [prefilledAgentMessage, setPrefilledAgentMessage] = useState('');
+
+    const handleTriggerAgentEdit = (clientSlug) => {
+        setPrefilledAgentMessage(`tolong edit file di dalam folder subdomain ${clientSlug}`);
+        handleTabChange('agent');
+    };
+
     useEffect(() => {
         const handleLogin = () => setIsAuthenticated(true);
         const handleLogout = () => setIsAuthenticated(false);
@@ -327,7 +334,7 @@ function App() {
                     : 'overflow-y-auto px-4 py-6 md:px-8 md:py-8 lg:px-12 lg:py-10 pb-24 lg:pb-10'
             }`}>
                 <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
-                    <Dashboard />
+                    <Dashboard onTriggerAgentEdit={handleTriggerAgentEdit} />
                 </div>
                 <div className={activeTab === 'templates' ? '' : 'hidden'}>
                     <Templates />
@@ -339,7 +346,10 @@ function App() {
                     <Sandbox />
                 </div>
                 <div className={activeTab === 'agent' ? 'h-full' : 'hidden'}>
-                    <Agent />
+                    <Agent 
+                        prefilledMessage={prefilledAgentMessage} 
+                        clearPrefilledMessage={() => setPrefilledAgentMessage('')} 
+                    />
                 </div>
             </main>
         </div>

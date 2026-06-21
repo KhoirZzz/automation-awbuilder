@@ -27,10 +27,19 @@ function tryParseDeployJson(text) {
     return null;
 }
 
-export default function Agent() {
+export default function Agent({ prefilledMessage, clearPrefilledMessage }) {
     const [config, setConfig] = useState(null);
     const [systemPrompt, setSystemPrompt] = useState('');
     const [userMessage, setUserMessage] = useState('');
+
+    useEffect(() => {
+        if (prefilledMessage) {
+            setUserMessage(prefilledMessage);
+            if (clearPrefilledMessage) {
+                clearPrefilledMessage();
+            }
+        }
+    }, [prefilledMessage, clearPrefilledMessage]);
     const [passkey, setPasskey] = useState(localStorage.getItem('agent_passkey') || '');
     const [lockModalOpen, setLockModalOpen] = useState(false);
     const [tempPasskey, setTempPasskey] = useState('');
