@@ -356,8 +356,9 @@ class DashboardController extends Controller
 
         $activeServiceKeys = ServiceTemplate::where('is_active', true)->pluck('key')->toArray();
         $durationKeys = collect(\App\Enums\ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
+        $activeSubdomains = Deployment::where('status', DeploymentStatus::ACTIVE)->pluck('client_slug')->toArray();
 
-        $defaultSystemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys);
+        $defaultSystemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys, $activeSubdomains);
 
         $chatHistory = AgentChat::orderBy('id', 'asc')
             ->get()
@@ -405,7 +406,8 @@ class DashboardController extends Controller
         // Always build the prompt dynamically based on the current database state
         $activeServiceKeys = ServiceTemplate::where('is_active', true)->pluck('key')->toArray();
         $durationKeys = collect(\App\Enums\ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
-        $systemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys);
+        $activeSubdomains = Deployment::where('status', DeploymentStatus::ACTIVE)->pluck('client_slug')->toArray();
+        $systemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys, $activeSubdomains);
 
         // Inject the Master / Developer recognition prompt
         $injectedSystemPrompt = "CRITICAL IDENTITY RECOGNITION:\n" .
@@ -414,16 +416,87 @@ class DashboardController extends Controller
             $systemPrompt;
 
         $messagesInput = $validated['messages'] ?? $validated['message'];
+        $chatMessages = [];
+        if (is_array($messagesInput)) {
+            $chatMessages = $messagesInput;
+        } elseif (is_string($messagesInput)) {
+            $chatMessages = [
+                [
+                    'role' => 'user',
+                    'content' => $messagesInput
+                ]
+            ];
+        }
+
+        $maxIterations = 3;
+        $iteration = 0;
+        $finalResponse = '';
 
         try {
-            $response = $hermesService->chat(
-                $injectedSystemPrompt,
-                $messagesInput
-            );
+            while ($iteration < $maxIterations) {
+                $response = $hermesService->chat(
+                    $injectedSystemPrompt,
+                    $chatMessages
+                );
+
+                // Clean the response text from potential markdown block formatting
+                $cleaned = trim($response);
+                if (str_starts_with($cleaned, '```json')) {
+                    $cleaned = substr($cleaned, 7);
+                } elseif (str_starts_with($cleaned, '```')) {
+                    $cleaned = substr($cleaned, 3);
+                }
+                if (str_ends_with($cleaned, '```')) {
+                    $cleaned = substr($cleaned, 0, -3);
+                }
+                $cleaned = trim($cleaned);
+
+                $toolCall = json_decode($cleaned, true);
+
+                if (json_last_error() === JSON_ERROR_NONE && is_array($toolCall) && isset($toolCall['status'])) {
+                    if ($toolCall['status'] === 'read_file' || $toolCall['status'] === 'write_file') {
+                        // It's a file tool call!
+                        $toolOutput = $this->executeFileToolCall($toolCall);
+
+                        // Add this assistant message and system response to the message array
+                        $chatMessages[] = [
+                            'role' => 'assistant',
+                            'content' => $response
+                        ];
+                        $chatMessages[] = [
+                            'role' => 'user',
+                            'content' => "SYSTEM FILE TOOL RESPONSE:\n" . $toolOutput
+                        ];
+
+                        $iteration++;
+                        continue;
+                    }
+                }
+
+                // If it's not a file tool call, we are done
+                $finalResponse = $response;
+                break;
+            }
+
+            if ($iteration >= $maxIterations) {
+                // If we exceeded loop limits without finishing, we force a final response.
+                $chatMessages[] = [
+                    'role' => 'assistant',
+                    'content' => $response
+                ];
+                $chatMessages[] = [
+                    'role' => 'user',
+                    'content' => "SYSTEM: Mohon berikan tanggapan akhir kepada Tuan Ridzz dalam bahasa Indonesia yang ramah, tanpa output JSON lagi."
+                ];
+                $finalResponse = $hermesService->chat(
+                    $injectedSystemPrompt,
+                    $chatMessages
+                );
+            }
 
             return response()->json([
                 'success' => true,
-                'response' => $response
+                'response' => $finalResponse
             ]);
         } catch (\Exception $e) {
             return response()->json([
@@ -431,6 +504,133 @@ class DashboardController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Helper to execute a file read or write operation requested by the AI Worker.
+     */
+    private function executeFileToolCall(array $toolCall): string
+    {
+        $clientSlug = $toolCall['client_slug'] ?? null;
+        $filePath = $toolCall['file_path'] ?? null;
+        $status = $toolCall['status'] ?? null;
+
+        if (empty($clientSlug)) {
+            return "ERROR: client_slug is required.";
+        }
+
+        // Validate client slug (alphanumeric and hyphens only)
+        if (!preg_match('/^[a-zA-Z0-9\-]+$/', $clientSlug)) {
+            return "ERROR: Invalid client_slug format.";
+        }
+
+        $deployment = Deployment::where('client_slug', $clientSlug)
+            ->where('status', DeploymentStatus::ACTIVE)
+            ->first();
+
+        if (!$deployment) {
+            return "ERROR: Active deployment with slug '{$clientSlug}' not found.";
+        }
+
+        $basePath = realpath($deployment->instance_path);
+        if (!$basePath || !File::isDirectory($basePath)) {
+            return "ERROR: Instance directory does not exist or is not valid.";
+        }
+
+        if (empty($filePath)) {
+            return "ERROR: file_path is required.";
+        }
+
+        // Security check: reject paths with '..' or starting with '/'
+        if (str_contains($filePath, '..') || str_starts_with($filePath, '/')) {
+            return "ERROR: Path traversal or absolute paths are not allowed.";
+        }
+
+        // Resolve target path
+        $targetPath = $basePath . '/' . $filePath;
+
+        // Auto-mapping: if file doesn't exist directly, check inside immediate subdirectories
+        if (!File::exists($targetPath)) {
+            $directories = File::directories($basePath);
+            foreach ($directories as $dir) {
+                $possiblePath = $dir . '/' . $filePath;
+                if (File::exists($possiblePath)) {
+                    $targetPath = $possiblePath;
+                    break;
+                }
+            }
+        }
+
+        // Auto-mapping for writing a new file: find correct root subdirectory if targetPath still doesn't exist
+        if (!File::exists($targetPath)) {
+            $directories = File::directories($basePath);
+            if (count($directories) === 1) {
+                $targetPath = $directories[0] . '/' . $filePath;
+            } elseif (count($directories) > 1) {
+                foreach ($directories as $dir) {
+                    if (File::exists($dir . '/index.html')) {
+                        $targetPath = $dir . '/' . $filePath;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Standardize paths and verify targetPath is within basePath
+        $realTargetPath = realpath($targetPath);
+        if ($realTargetPath) {
+            if (!str_starts_with($realTargetPath, $basePath)) {
+                return "ERROR: Security violation. Access outside the sandbox is forbidden.";
+            }
+        } else {
+            $tempPath = $targetPath;
+            while (!empty($tempPath) && !File::exists($tempPath)) {
+                $tempPath = dirname($tempPath);
+            }
+            $realParentPath = realpath($tempPath);
+            if (!$realParentPath || !str_starts_with($realParentPath, $basePath)) {
+                return "ERROR: Security violation. Access outside the sandbox is forbidden.";
+            }
+        }
+
+        if ($status === 'read_file') {
+            if (!File::exists($targetPath)) {
+                return "ERROR: File does not exist: {$filePath}";
+            }
+            if (File::isDirectory($targetPath)) {
+                return "ERROR: Path '{$filePath}' is a directory, not a file.";
+            }
+            if (File::size($targetPath) > 51200) {
+                return "ERROR: File is too large to read (max 50KB).";
+            }
+            return File::get($targetPath);
+        } elseif ($status === 'write_file') {
+            $content = $toolCall['content'] ?? '';
+            $targetBlock = $toolCall['target'] ?? null;
+
+            $dirPath = dirname($targetPath);
+            if (!File::isDirectory($dirPath)) {
+                File::makeDirectory($dirPath, 0755, true);
+            }
+
+            if (empty($targetBlock)) {
+                File::put($targetPath, $content);
+                return "SUCCESS: File '{$filePath}' has been fully overwritten/created successfully.";
+            } else {
+                if (!File::exists($targetPath)) {
+                    return "ERROR: Cannot replace target block because the file does not exist.";
+                }
+                $existingContent = File::get($targetPath);
+                if (!str_contains($existingContent, $targetBlock)) {
+                    return "ERROR: Target text block to replace was not found inside the file.";
+                }
+                $newContent = str_replace($targetBlock, $content, $existingContent);
+                File::put($targetPath, $newContent);
+                return "SUCCESS: Target block in file '{$filePath}' has been replaced successfully.";
+            }
+        }
+
+        return "ERROR: Unknown file tool status.";
     }
 
     /**

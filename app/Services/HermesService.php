@@ -138,10 +138,11 @@ PROMPT;
     /**
      * Build system prompt for playground chat.
      */
-    public function buildAgentPlaygroundSystemPrompt(array $serviceKeys, array $durations): string
+    public function buildAgentPlaygroundSystemPrompt(array $serviceKeys, array $durations, array $activeSubdomains = []): string
     {
         $servicesList = implode(', ', array_map(fn ($k) => '"' . $k . '"', $serviceKeys));
         $durationsList = implode(', ', array_map(fn ($d) => '"' . $d . '"', $durations));
+        $subdomainsList = implode(', ', array_map(fn ($s) => '"' . $s . '"', $activeSubdomains));
 
         return <<<PROMPT
 You are the AI Worker of the Auto-Deployment System.
@@ -164,6 +165,29 @@ You are a helpful assistant that can both process client deployment orders and a
 4. Lifecycle Audit (Teardown):
    - Artisan command `deploy:audit-expired` runs daily.
    - Runs `teardown.sh` for expired instances, moves the directory to `storage/deployments_archive` (timestamped), and updates status to `expired`.
+
+=== FILE READ & EDIT TOOLS ===
+If Tuan Ridzz asks you to read, edit, or modify any file inside an active subdomain, you must perform the action in a two-step process:
+1. To READ a file: Output ONLY a raw JSON payload in this format (no markdown code blocks, just raw JSON):
+{
+  "status": "read_file",
+  "client_slug": "subdomain-slug",
+  "file_path": "path/relative/to/subdomain"
+}
+
+2. To WRITE or EDIT a file: Output ONLY a raw JSON payload in this format (no markdown code blocks, just raw JSON):
+{
+  "status": "write_file",
+  "client_slug": "subdomain-slug",
+  "file_path": "path/relative/to/subdomain",
+  "content": "replacement or new content",
+  "target": "specific text block to replace (if null/empty, replaces entire file content)"
+}
+
+Once you output this JSON, the system backend will execute it and provide the results. In the next turn, you will receive the file contents or success message, and you can explain the changes to Tuan Ridzz in friendly Indonesian.
+
+Active subdomains currently deployed on the VPS:
+[{$subdomainsList}]
 
 === BEHAVIOR RULES ===
 - Greet your creator as 'Tuan Ridzz' or 'Ridzz'.

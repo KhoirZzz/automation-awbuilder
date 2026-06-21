@@ -165,4 +165,239 @@ class AgentPlaygroundTest extends TestCase
             ]
         ]);
     }
+
+    public function test_agent_chat_with_read_file_tool_call(): void
+    {
+        // Set up temporary mock folder structures
+        $clientSlug = 'agoda-test';
+        $instancePath = storage_path('app/deployments/' . $clientSlug);
+        if (!\Illuminate\Support\Facades\File::isDirectory($instancePath)) {
+            \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true);
+        }
+        $testFile = $instancePath . '/index.html';
+        \Illuminate\Support\Facades\File::put($testFile, '<h1>Welcome to Agoda!</h1>');
+
+        // Create deployment record
+        $template = \App\Models\ServiceTemplate::create([
+            'key' => 'agoda',
+            'name' => 'Agoda App',
+            'category' => 'landing',
+            'template_path' => 'layanan/agoda',
+            'is_active' => true,
+        ]);
+
+        \App\Models\Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => '1234',
+            'service_template_id' => $template->id,
+            'client_slug' => $clientSlug,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+            'status' => \App\Enums\DeploymentStatus::ACTIVE,
+            'price' => 100000,
+        ]);
+
+        // Fake LLM Responses:
+        // 1st call asks to read the file
+        // 2nd call responds with a friendly text after receiving file content
+        Http::fake([
+            'integrate.api.nvidia.com/*' => Http::sequence([
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => json_encode([
+                                    'status' => 'read_file',
+                                    'client_slug' => $clientSlug,
+                                    'file_path' => 'index.html',
+                                ])
+                            ]
+                        ]
+                    ]
+                ], 200),
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => 'Saya sudah membaca file tersebut, isinya adalah Welcome to Agoda!'
+                            ]
+                        ]
+                    ]
+                ], 200),
+            ])
+        ]);
+
+        $response = $this->postJson('/api/dashboard/agent/chat', [
+            'message' => 'Tolong baca isi file index.html di subdomain agoda-test.',
+            'passkey' => '852963'
+        ], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'response' => 'Saya sudah membaca file tersebut, isinya adalah Welcome to Agoda!'
+        ]);
+
+        // Clean up
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/deployments'));
+    }
+
+    public function test_agent_chat_with_write_file_tool_call(): void
+    {
+        $clientSlug = 'agoda-test-write';
+        $instancePath = storage_path('app/deployments/' . $clientSlug);
+        if (!\Illuminate\Support\Facades\File::isDirectory($instancePath)) {
+            \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true);
+        }
+        $testFile = $instancePath . '/index.html';
+        \Illuminate\Support\Facades\File::put($testFile, '<h1>Welcome to Agoda!</h1>');
+
+        $template = \App\Models\ServiceTemplate::create([
+            'key' => 'agoda',
+            'name' => 'Agoda App',
+            'category' => 'landing',
+            'template_path' => 'layanan/agoda',
+            'is_active' => true,
+        ]);
+
+        \App\Models\Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => '1234',
+            'service_template_id' => $template->id,
+            'client_slug' => $clientSlug,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+            'status' => \App\Enums\DeploymentStatus::ACTIVE,
+            'price' => 100000,
+        ]);
+
+        // Fake LLM responses:
+        // 1st call asks to write to the file
+        // 2nd call responds with a friendly response after file modification
+        Http::fake([
+            'integrate.api.nvidia.com/*' => Http::sequence([
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => json_encode([
+                                    'status' => 'write_file',
+                                    'client_slug' => $clientSlug,
+                                    'file_path' => 'index.html',
+                                    'content' => '<h2>Hello World</h2>',
+                                    'target' => '<h1>Welcome to Agoda!</h1>'
+                                ])
+                            ]
+                        ]
+                    ]
+                ], 200),
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => 'Saya sudah mengganti judul di file index.html menjadi Hello World.'
+                            ]
+                        ]
+                    ]
+                ], 200),
+            ])
+        ]);
+
+        $response = $this->postJson('/api/dashboard/agent/chat', [
+            'message' => 'Tolong ubah H1 di index.html di subdomain agoda-test-write.',
+            'passkey' => '852963'
+        ], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'response' => 'Saya sudah mengganti judul di file index.html menjadi Hello World.'
+        ]);
+
+        // Verify file modified
+        $this->assertEquals('<h2>Hello World</h2>', \Illuminate\Support\Facades\File::get($testFile));
+
+        // Clean up
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/deployments'));
+    }
+
+    public function test_agent_chat_rejects_directory_traversal(): void
+    {
+        $clientSlug = 'agoda-test-traversal';
+        $instancePath = storage_path('app/deployments/' . $clientSlug);
+        if (!\Illuminate\Support\Facades\File::isDirectory($instancePath)) {
+            \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true);
+        }
+
+        $template = \App\Models\ServiceTemplate::create([
+            'key' => 'agoda',
+            'name' => 'Agoda App',
+            'category' => 'landing',
+            'template_path' => 'layanan/agoda',
+            'is_active' => true,
+        ]);
+
+        \App\Models\Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => '1234',
+            'service_template_id' => $template->id,
+            'client_slug' => $clientSlug,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+            'status' => \App\Enums\DeploymentStatus::ACTIVE,
+            'price' => 100000,
+        ]);
+
+        // 1st response: attempt path traversal
+        // 2nd response: LLM gets the error, yields conversation response
+        Http::fake([
+            'integrate.api.nvidia.com/*' => Http::sequence([
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => json_encode([
+                                    'status' => 'read_file',
+                                    'client_slug' => $clientSlug,
+                                    'file_path' => '../../../../etc/passwd',
+                                ])
+                            ]
+                        ]
+                    ]
+                ], 200),
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => 'Maaf, saya tidak diizinkan mengakses file di luar sandbox.'
+                            ]
+                        ]
+                    ]
+                ], 200),
+            ])
+        ]);
+
+        $response = $this->postJson('/api/dashboard/agent/chat', [
+            'message' => 'Tolong baca file rahasia.',
+            'passkey' => '852963'
+        ], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'response' => 'Maaf, saya tidak diizinkan mengakses file di luar sandbox.'
+        ]);
+
+        // Clean up
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/deployments'));
+    }
 }
