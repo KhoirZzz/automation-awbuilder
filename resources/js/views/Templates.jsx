@@ -86,13 +86,27 @@ export default function Templates() {
         }
 
         try {
-            const res = await fetch(`/api/dashboard/templates/${id}`, {
+            let res = await fetch(`/api/dashboard/templates/${id}`, {
                 method: 'DELETE'
             });
-            const data = await res.json();
+            let data = await res.json();
+            
             if (res.status === 200 && data.success) {
                 fetchTemplates();
                 showBanner('success', `Blueprint "${name}" berhasil dihapus.`);
+            } else if (res.status === 400 && data.error && data.error.includes('riwayat/aktif')) {
+                if (confirm(`${data.error}\n\nApakah Anda yakin ingin memaksa (force) menghapus blueprint ini? Tindakan ini akan menghentikan (teardown) semua deployment aktif yang terikat dan menghapus seluruh data riwayat deployment terkait.`)) {
+                    res = await fetch(`/api/dashboard/templates/${id}?force=true`, {
+                        method: 'DELETE'
+                    });
+                    data = await res.json();
+                    if (res.status === 200 && data.success) {
+                        fetchTemplates();
+                        showBanner('success', `Blueprint "${name}" dan seluruh riwayat terkait berhasil dihapus.`);
+                    } else {
+                        showBanner('error', data.error || 'Gagal memaksa menghapus template.');
+                    }
+                }
             } else {
                 showBanner('error', data.error || 'Gagal menghapus template.');
             }

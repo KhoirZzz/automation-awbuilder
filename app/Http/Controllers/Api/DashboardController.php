@@ -69,15 +69,39 @@ class DashboardController extends Controller
     /**
      * Delete a service template and its files.
      */
-    public function destroyTemplate($id): JsonResponse
+    public function destroyTemplate($id, Request $request): JsonResponse
     {
         $template = ServiceTemplate::findOrFail($id);
+        $force = $request->boolean('force');
 
         if ($template->deployments()->count() > 0) {
-            return response()->json([
-                'success' => false,
-                'error' => 'Template tidak dapat dihapus karena memiliki riwayat/aktif deployment.'
-            ], 400);
+            if (!$force) {
+                return response()->json([
+                    'success' => false,
+                    'error' => 'Template tidak dapat dihapus karena memiliki riwayat/aktif deployment.'
+                ], 400);
+            }
+
+            // Force delete: Teardown active deployments first, then delete all deployment records
+            foreach ($template->deployments as $deployment) {
+                if ($deployment->status === DeploymentStatus::ACTIVE) {
+                    $instancePath = $deployment->instance_path;
+                    try {
+                        if (File::isDirectory($instancePath)) {
+                            $teardownScript = $instancePath . '/teardown.sh';
+                            if (File::exists($teardownScript)) {
+                                Process::path($instancePath)
+                                    ->timeout(60)
+                                    ->run(['bash', 'teardown.sh', $deployment->client_slug]);
+                            }
+                            File::deleteDirectory($instancePath);
+                        }
+                    } catch (\Exception $ex) {
+                        Log::channel('deploy-audit')->error('Failed to teardown during template force delete: ' . $ex->getMessage());
+                    }
+                }
+                $deployment->delete();
+            }
         }
 
         $templateBasePath = config('deploy.template_base_path');
@@ -97,7 +121,7 @@ class DashboardController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Template berhasil dihapus.'
+            'message' => $force ? 'Template dan seluruh riwayat deployment terkait berhasil dihapus.' : 'Template berhasil dihapus.'
         ]);
     }
 

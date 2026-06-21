@@ -217,6 +217,62 @@ class TemplateZipTest extends TestCase
         ]);
     }
 
+    public function test_delete_template_success_with_force(): void
+    {
+        // 1. Create template
+        $template = ServiceTemplate::create([
+            'key' => 'force-delete-me',
+            'name' => 'Force Delete Me Template',
+            'template_path' => 'force-delete-folder',
+            'is_active' => true
+        ]);
+
+        // 2. Create template directory
+        $folderPath = $this->templateDir . '/force-delete-folder';
+        File::makeDirectory($folderPath, 0755, true);
+        File::put($folderPath . '/index.html', 'dummy index');
+
+        // 3. Create associated deployment
+        $instancePath = storage_path('app/deployments/force-active-slug');
+        File::makeDirectory($instancePath, 0755, true);
+        File::put($instancePath . '/index.html', 'dummy deploy');
+
+        $deployment = \App\Models\Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => '9999-force',
+            'service_template_id' => $template->id,
+            'client_slug' => 'force-active-slug',
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+            'status' => \App\Enums\DeploymentStatus::ACTIVE,
+            'price' => 50000,
+        ]);
+
+        // 4. Request deletion with force=true
+        $response = $this->deleteJson('/api/dashboard/templates/' . $template->id . '?force=true', [], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'message' => 'Template dan seluruh riwayat deployment terkait berhasil dihapus.'
+        ]);
+
+        // 5. Verify template and deployment removed from DB
+        $this->assertDatabaseMissing('service_templates', [
+            'id' => $template->id
+        ]);
+        $this->assertDatabaseMissing('deployments', [
+            'id' => $deployment->id
+        ]);
+
+        // 6. Verify folders deleted on disk
+        $this->assertDirectoryDoesNotExist($folderPath);
+        $this->assertDirectoryDoesNotExist($instancePath);
+    }
+
     public function test_delete_zip_success(): void
     {
         // 1. Create a dummy zip file in the upload directory
