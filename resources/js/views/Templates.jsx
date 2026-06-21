@@ -784,14 +784,15 @@ export default function Templates() {
                 isOpen={fmOpen}
                 onClose={() => setFmOpen(false)}
                 title={fmTemplate ? `File Manager: ${fmTemplate.name}` : 'File Manager'}
-                className="w-11/12 max-w-5xl"
+                className="w-[98vw] max-w-[98vw] md:max-w-7xl h-[95vh] md:h-[90vh] flex flex-col p-4 md:p-6"
+                bodyClassName="flex-1 min-h-0 py-4 flex flex-col"
                 footer={
                     <Button variant="secondary" onClick={() => setFmOpen(false)}>Close</Button>
                 }
             >
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 font-mono text-xs">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-4 md:gap-6 font-mono text-xs flex-1 min-h-0 overflow-y-auto md:overflow-hidden">
                     {/* Left Pane: Files & Directories */}
-                    <div className="md:col-span-4 border border-zinc-800 rounded bg-zinc-950 p-4 space-y-4 flex flex-col h-[400px]">
+                    <div className="md:col-span-4 border border-zinc-800 rounded bg-zinc-950 p-3 md:p-4 space-y-4 flex flex-col h-[350px] md:h-full min-h-[300px]">
                         <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
                             <span className="font-bold text-zinc-400 uppercase tracking-wider text-[10px]">Files & Folders</span>
                             {fmNewInputOpen ? (
@@ -931,7 +932,7 @@ export default function Templates() {
                     </div>
 
                     {/* Right Pane: Code Editor */}
-                    <div className="md:col-span-8 border border-zinc-800 rounded bg-zinc-950 p-4 flex flex-col h-[400px] space-y-3">
+                    <div className="md:col-span-8 border border-zinc-800 rounded bg-zinc-950 p-3 md:p-4 flex flex-col h-[500px] md:h-full min-h-[400px] space-y-3">
                         {fmSelectedFile ? (
                             <>
                                 <div className="flex items-center justify-between border-b border-zinc-900 pb-2.5">

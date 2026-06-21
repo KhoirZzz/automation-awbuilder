@@ -1,8 +1,11 @@
 import React from 'react';
 import { Button } from './Button';
 
-export const Modal = ({ isOpen, onClose, title, children, footer, className = '' }) => {
+export const Modal = ({ isOpen, onClose, title, children, footer, className = '', bodyClassName = '' }) => {
     if (!isOpen) return null;
+
+    const hasMaxWidth = className.includes('max-w-');
+    const defaultWidthClass = hasMaxWidth ? '' : 'max-w-lg w-full';
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -10,9 +13,9 @@ export const Modal = ({ isOpen, onClose, title, children, footer, className = ''
             <div className="absolute inset-0 bg-black/85 backdrop-blur-xs transition-opacity duration-300" onClick={onClose} />
 
             {/* Modal Content */}
-            <div className={`relative bg-zinc-950 border border-zinc-800 rounded-lg w-full max-w-lg shadow-2xl p-6 transition-all ${className}`}>
+            <div className={`relative bg-zinc-950 border border-zinc-800 rounded-lg shadow-2xl p-6 transition-all ${defaultWidthClass} ${className}`}>
                 {/* Header */}
-                <div className="flex items-center justify-between pb-4 border-b border-zinc-800">
+                <div className="flex items-center justify-between pb-4 border-b border-zinc-800 flex-none">
                     <h3 className="font-bold text-base text-zinc-100 uppercase tracking-wider font-mono">{title}</h3>
                     <button 
                         onClick={onClose} 
@@ -25,12 +28,12 @@ export const Modal = ({ isOpen, onClose, title, children, footer, className = ''
                 </div>
 
                 {/* Body */}
-                <div className="py-5 text-sm text-zinc-300">
+                <div className={`text-sm text-zinc-300 ${bodyClassName || 'py-5'}`}>
                     {children}
                 </div>
 
                 {/* Footer */}
-                <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-zinc-800">
+                <div className="flex items-center justify-end gap-2.5 pt-4 border-t border-zinc-800 flex-none">
                     {footer ? footer : (
                         <Button variant="secondary" onClick={onClose}>Close</Button>
                     )}
