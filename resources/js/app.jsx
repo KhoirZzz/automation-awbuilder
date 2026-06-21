@@ -330,7 +330,7 @@ function App() {
 
             <main className={`flex-1 bg-black max-w-7xl w-full ${
                 activeTab === 'agent'
-                    ? 'h-[calc(100dvh-136px)] lg:h-auto overflow-hidden lg:overflow-y-auto p-4 md:p-8 lg:px-12 lg:py-10 lg:pb-10'
+                    ? 'h-[calc(100dvh-160px)] lg:h-auto overflow-hidden lg:overflow-y-auto p-4 md:p-8 lg:px-12 lg:py-10 lg:pb-10'
                     : 'overflow-y-auto px-4 py-6 md:px-8 md:py-8 lg:px-12 lg:py-10 pb-24 lg:pb-10'
             }`}>
                 <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
