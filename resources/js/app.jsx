@@ -101,7 +101,7 @@ function App() {
                     <img 
                         src="/logo/awbuilder.png" 
                         alt="AWBuilder" 
-                        className="h-7 w-7 object-contain rounded"
+                        className="h-7 w-7 object-cover rounded-full"
                     />
                     <div>
                         <span className="font-bold text-zinc-100 tracking-tight text-xs uppercase block font-mono">AUTODEPLOY</span>
@@ -150,7 +150,7 @@ function App() {
                     <img 
                         src="/logo/awbuilder.png" 
                         alt="AWBuilder" 
-                        className="h-8 w-8 object-contain rounded"
+                        className="h-8 w-8 object-cover rounded-full"
                     />
                     <div>
                         <span className="font-bold text-zinc-100 tracking-tight text-sm uppercase block font-mono">AUTODEPLOY</span>
