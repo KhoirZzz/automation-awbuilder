@@ -7,7 +7,7 @@ import { Alert } from '../components/Alert';
 
 const getDeploymentUrl = (clientSlug) => {
     const hostname = window.location.hostname;
-    const baseDomain = hostname.includes('mockbuild.shop') ? hostname : 'mockbuild.shop';
+    const baseDomain = hostname.replace(/^(admin|dashboard|www|api)\./i, '');
     return `http://${clientSlug}.${baseDomain}`;
 };
 
