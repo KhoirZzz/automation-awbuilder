@@ -3,12 +3,18 @@ import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Badge } from '../components/Badge';
 import { Modal } from '../components/Modal';
+import { Alert } from '../components/Alert';
 
 export default function Templates() {
     const [templates, setTemplates] = useState([]);
     const [zips, setZips] = useState([]);
     const [loading, setLoading] = useState(true);
     const [modalOpen, setModalOpen] = useState(false);
+    const [banner, setBanner] = useState(null); // { type: 'success'|'error'|'warning', text }
+
+    const showBanner = (type, text) => {
+        setBanner({ type, text });
+    };
     
     // Manual template form states
     const [newKey, setNewKey] = useState('');
@@ -67,9 +73,10 @@ export default function Templates() {
             const data = await res.json();
             if (data.success) {
                 fetchTemplates();
+                showBanner('success', 'Status blueprint berhasil diubah.');
             }
         } catch (e) {
-            alert('Failed to toggle template status.');
+            showBanner('error', 'Gagal mengubah status blueprint.');
         }
     };
 
@@ -85,11 +92,12 @@ export default function Templates() {
             const data = await res.json();
             if (res.status === 200 && data.success) {
                 fetchTemplates();
+                showBanner('success', `Blueprint "${name}" berhasil dihapus.`);
             } else {
-                alert(data.error || 'Gagal menghapus template.');
+                showBanner('error', data.error || 'Gagal menghapus template.');
             }
         } catch (e) {
-            alert('Gagal menghapus template. Hubungi administrator.');
+            showBanner('error', 'Gagal menghapus template. Hubungi administrator.');
         }
     };
 
@@ -109,9 +117,9 @@ export default function Templates() {
             });
             const data = await res.json();
             if (data.error) {
-                alert(data.error);
+                showBanner('error', data.error);
             } else if (res.status === 422) {
-                alert(JSON.stringify(data.errors));
+                showBanner('error', JSON.stringify(data.errors));
             } else {
                 setModalOpen(false);
                 setNewKey('');
@@ -119,9 +127,10 @@ export default function Templates() {
                 setNewCategory('');
                 setNewPath('');
                 fetchTemplates();
+                showBanner('success', `Blueprint "${newName}" berhasil diregistrasi secara manual.`);
             }
         } catch (err) {
-            alert('Failed to save template.');
+            showBanner('error', 'Gagal menyimpan blueprint baru.');
         }
     };
 
@@ -150,11 +159,12 @@ export default function Templates() {
                 // Clear input
                 document.getElementById('zipFileInput').value = '';
                 fetchZips();
+                showBanner('success', 'Arsip ZIP template berhasil diunggah.');
             } else {
-                alert(data.error || 'Failed to upload ZIP.');
+                showBanner('error', data.error || 'Failed to upload ZIP.');
             }
         } catch (err) {
-            alert('Error uploading file.');
+            showBanner('error', 'Gagal mengunggah file.');
         } finally {
             setUploading(false);
         }
@@ -167,12 +177,12 @@ export default function Templates() {
         const category = (extractionCategories[zipFilename] || '').trim();
 
         if (!key || !name) {
-            alert('Silakan isi Template Key dan Display Name terlebih dahulu.');
+            showBanner('warning', 'Silakan isi Template Key dan Display Name terlebih dahulu.');
             return;
         }
 
         if (!/^[a-z0-9-]+$/.test(key)) {
-            alert('Template Key harus berupa huruf kecil, angka, atau tanda hubung saja (a-z0-9-).');
+            showBanner('warning', 'Template Key harus berupa huruf kecil, angka, atau tanda hubung saja (a-z0-9-).');
             return;
         }
 
@@ -183,7 +193,7 @@ export default function Templates() {
             setHoldProgress((prev) => {
                 if (prev >= 100) {
                     clearInterval(holdIntervalRef.current);
-                    triggerExtraction(zipFilename, key, name);
+                    triggerExtraction(zipFilename, key, name, category);
                     return 100;
                 }
                 return prev + 5; // Takes 1.0s to hit 100% (20 ticks of 50ms)
@@ -228,12 +238,13 @@ export default function Templates() {
                     return next;
                 });
                 await loadAllData();
+                showBanner('success', `ZIP "${filename}" berhasil diekstrak dan didaftarkan sebagai blueprint "${name}".`);
             } else {
-                alert(data.error || 'Ekstraksi gagal.');
+                showBanner('error', data.error || 'Ekstraksi gagal.');
                 setLoading(false);
             }
         } catch (err) {
-            alert('Koneksi API gagal.');
+            showBanner('error', 'Koneksi API gagal.');
             setLoading(false);
         }
     };
@@ -276,6 +287,14 @@ export default function Templates() {
                     + Register Folder Manually
                 </Button>
             </div>
+
+            {banner && (
+                <Alert 
+                    type={banner.type} 
+                    message={banner.text} 
+                    onClose={() => setBanner(null)} 
+                />
+            )}
 
             {/* Template list Grouped by Categories */}
             <div className="space-y-10">

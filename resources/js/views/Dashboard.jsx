@@ -3,6 +3,13 @@ import { StatCard, Card } from '../components/Card';
 import { Badge } from '../components/Badge';
 import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
+import { Alert } from '../components/Alert';
+
+const getDeploymentUrl = (clientSlug) => {
+    const hostname = window.location.hostname;
+    const baseDomain = hostname.includes('mockbuild.shop') ? hostname : 'mockbuild.shop';
+    return `http://${clientSlug}.${baseDomain}`;
+};
 
 export default function Dashboard() {
     const [stats, setStats] = useState(null);
@@ -183,14 +190,11 @@ export default function Dashboard() {
 
             {/* Notification Banner */}
             {banner && (
-                <div className={`p-4 border rounded text-xs transition-opacity duration-300 ${
-                    banner.type === 'success' 
-                        ? 'bg-zinc-900 border-zinc-800 text-zinc-100' 
-                        : 'bg-red-950/20 border-red-900/40 text-red-400'
-                }`}>
-                    <span className="font-bold uppercase block text-[10px] mb-0.5">{banner.type}</span>
-                    {banner.text}
-                </div>
+                <Alert 
+                    type={banner.type} 
+                    message={banner.text} 
+                    onClose={() => setBanner(null)} 
+                />
             )}
 
             {/* Stats Cards */}
@@ -265,6 +269,19 @@ export default function Dashboard() {
                                 <div className="flex items-start justify-between">
                                     <div>
                                         <span className="font-sans font-bold text-zinc-200 block text-sm">{dep.client_slug}</span>
+                                        {dep.status === 'active' && (
+                                            <a 
+                                                href={getDeploymentUrl(dep.client_slug)} 
+                                                target="_blank" 
+                                                rel="noopener noreferrer"
+                                                className="text-[10px] text-zinc-400 hover:text-white font-mono flex items-center gap-0.5 mt-0.5 underline decoration-zinc-700 hover:decoration-zinc-400"
+                                            >
+                                                {dep.client_slug}.mockbuild.shop
+                                                <svg className="w-2.5 h-2.5 text-zinc-500 inline" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                                </svg>
+                                            </a>
+                                        )}
                                         <span className="text-[9px] text-zinc-600 font-mono block mt-0.5 tracking-tight">
                                             ID: {dep.lead_reference || 'NONE'}
                                         </span>
@@ -370,6 +387,19 @@ export default function Dashboard() {
                                     <tr key={dep.id} className="hover:bg-zinc-950 transition-colors">
                                         <td className="px-6 py-4 font-sans">
                                             <span className="font-bold text-zinc-200 block">{dep.client_slug}</span>
+                                            {dep.status === 'active' && (
+                                                <a 
+                                                    href={getDeploymentUrl(dep.client_slug)} 
+                                                    target="_blank" 
+                                                    rel="noopener noreferrer"
+                                                    className="text-[10px] text-zinc-400 hover:text-white font-mono flex items-center gap-0.5 mt-0.5 underline decoration-zinc-700 hover:decoration-zinc-400"
+                                                >
+                                                    {dep.client_slug}.mockbuild.shop
+                                                    <svg className="w-2.5 h-2.5 text-zinc-500 inline" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
+                                                    </svg>
+                                                </a>
+                                            )}
                                             <span className="text-[10px] text-zinc-600 font-mono block mt-0.5 tracking-tight">
                                                 ID: {dep.lead_reference || 'NONE'}
                                             </span>
