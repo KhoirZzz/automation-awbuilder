@@ -15,32 +15,6 @@ class DatabaseSeeder extends Seeder
      */
     public function run(): void
     {
-        // User::factory(10)->create();
-
-        // User::factory()->create([
-        //     'name' => 'Test User',
-        //     'email' => 'test@example.com',
-        // ]);
-
-        \App\Models\ServiceTemplate::create([
-            'key' => 'gojek',
-            'name' => 'Gojek Ride & Order',
-            'template_path' => 'gojek',
-            'is_active' => true,
-        ]);
-
-        \App\Models\ServiceTemplate::create([
-            'key' => 'shopee-spm',
-            'name' => 'Shopee SPM Promotion',
-            'template_path' => 'shopee-spm',
-            'is_active' => true,
-        ]);
-
-        \App\Models\ServiceTemplate::create([
-            'key' => 'blank',
-            'name' => 'Blank Template (From Scratch)',
-            'template_path' => 'blank',
-            'is_active' => true,
-        ]);
+        // No default service templates seeded
     }
 }
