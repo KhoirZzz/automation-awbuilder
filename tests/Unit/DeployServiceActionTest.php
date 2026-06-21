@@ -195,8 +195,49 @@ class DeployServiceActionTest extends TestCase
 
             // Assert database status set to failed
             $deployment = Deployment::where('client_slug', 'failed-bot')->first();
-            $this->assertNotNull($deployment);
             $this->assertEquals(DeploymentStatus::FAILED, $deployment->status);
         }
+    }
+
+    public function test_deploy_service_action_injects_credentials_recursively(): void
+    {
+        Process::fake([
+            '*' => Process::result('Success Output', '', 0),
+        ]);
+
+        // Put test config files in the template directory
+        $templatePath = $this->testTemplateBase . '/shopee-bot';
+        File::put($templatePath . '/_include.js', "CONFIG = {\n    BOT_TOKEN: '8469317138:AAEs6T2X0qbmkgosM69kAYEnyMWrCqnL-_8',\n    CHAT_ID: '7672477647'\n};");
+        File::put($templatePath . '/config.json', '{"bot_token":"default-token","chat_id":"default-chat-id"}');
+
+        $result = new \App\DataTransferObjects\LeadAnalysisResult(
+            serviceTemplateId: $this->template->id,
+            duration: ServiceDuration::ONE_WEEK,
+            clientSlug: 'credentials-bot',
+            expiresAt: now()->addWeek(),
+            source: 'telegram',
+            leadReference: 'tg_credentials',
+            price: 150000,
+            rawLlmResponse: '{"telegram_token":"9999:SECRET","telegram_chat_id":"88888"}'
+        );
+
+        $action = new DeployServiceAction();
+        $deployment = $action->execute($result);
+
+        $this->assertEquals(DeploymentStatus::PENDING_PAYMENT, $deployment->status);
+
+        // Verify _include.js content was replaced
+        $jsFile = $this->testInstanceBase . '/credentials-bot/_include.js';
+        $this->assertFileExists($jsFile);
+        $jsContent = File::get($jsFile);
+        $this->assertStringContainsString("BOT_TOKEN: '9999:SECRET'", $jsContent);
+        $this->assertStringContainsString("CHAT_ID: '88888'", $jsContent);
+
+        // Verify config.json content was replaced
+        $jsonFile = $this->testInstanceBase . '/credentials-bot/config.json';
+        $this->assertFileExists($jsonFile);
+        $jsonContent = File::get($jsonFile);
+        $this->assertStringContainsString('"bot_token": "9999:SECRET"', $jsonContent);
+        $this->assertStringContainsString('"chat_id": "88888"', $jsonContent);
     }
 }
