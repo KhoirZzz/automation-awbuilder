@@ -400,4 +400,88 @@ class AgentPlaygroundTest extends TestCase
         // Clean up
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/deployments'));
     }
+
+    public function test_agent_chat_parses_conversational_json_tool_calls(): void
+    {
+        $clientSlug = 'agoda-test-conversational';
+        $instancePath = storage_path('app/deployments/' . $clientSlug);
+        if (!\Illuminate\Support\Facades\File::isDirectory($instancePath)) {
+            \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true);
+        }
+
+        $testFile = $instancePath . '/index.php';
+        \Illuminate\Support\Facades\File::put($testFile, '<?php echo "Old Content";');
+
+        $template = \App\Models\ServiceTemplate::create([
+            'key' => 'agoda',
+            'name' => 'Agoda App',
+            'category' => 'landing',
+            'template_path' => 'layanan/agoda',
+            'is_active' => true,
+        ]);
+
+        \App\Models\Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => '12345',
+            'service_template_id' => $template->id,
+            'client_slug' => $clientSlug,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+            'status' => \App\Enums\DeploymentStatus::ACTIVE,
+            'price' => 100000,
+        ]);
+
+        // Fake LLM response with conversational intro and markdown code blocks
+        Http::fake([
+            'integrate.api.nvidia.com/*' => Http::sequence([
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => "Tentu Tuan Ridzz, saya akan mengedit file tersebut.\n" .
+                                    "```json\n" .
+                                    "{\n" .
+                                    "  \"status\": \"write_file\",\n" .
+                                    "  \"client_slug\": \"{$clientSlug}\",\n" .
+                                    "  \"file_path\": \"index.php\",\n" .
+                                    "  \"content\": \"<?php echo 'New Content';\"\n" .
+                                    "}\n" .
+                                    "```\n" .
+                                    "Semoga berhasil!"
+                            ]
+                        ]
+                    ]
+                ], 200),
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => 'Saya sudah memperbarui file index.php sesuai permintaan Anda, Tuan Ridzz.'
+                            ]
+                        ]
+                    ]
+                ], 200),
+            ])
+        ]);
+
+        $response = $this->postJson('/api/dashboard/agent/chat', [
+            'message' => 'Edit file index.php di agoda-test-conversational.',
+            'passkey' => '852963'
+        ], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'response' => 'Saya sudah memperbarui file index.php sesuai permintaan Anda, Tuan Ridzz.'
+        ]);
+
+        // Verify file modified
+        $this->assertEquals("<?php echo 'New Content';", \Illuminate\Support\Facades\File::get($testFile));
+
+        // Clean up
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/deployments'));
+    }
 }

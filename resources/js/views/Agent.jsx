@@ -5,25 +5,49 @@ import { Modal } from '../components/Modal';
 
 function tryParseDeployJson(text) {
     if (!text) return null;
-    let cleanText = text.trim();
-    if (cleanText.startsWith('```json')) {
-        cleanText = cleanText.substring(7);
-    } else if (cleanText.startsWith('```')) {
-        cleanText = cleanText.substring(3);
-    }
-    if (cleanText.endsWith('```')) {
-        cleanText = cleanText.substring(0, cleanText.length - 3);
-    }
-    cleanText = cleanText.trim();
-
-    try {
-        const parsed = JSON.parse(cleanText);
-        if (parsed && (parsed.status === 'ready_to_deploy' || parsed.ready_to_deploy === true)) {
-            return parsed;
+    
+    // Helper to decode JSON
+    const tryDecode = (str) => {
+        try {
+            const parsed = JSON.parse(str.trim());
+            if (parsed && (parsed.status === 'ready_to_deploy' || parsed.ready_to_deploy === true)) {
+                return parsed;
+            }
+        } catch (e) {
+            // ignore
         }
-    } catch (e) {
-        // Ignore parsing error
+        return null;
+    };
+
+    // 1. Try decoding the whole string directly
+    let res = tryDecode(text);
+    if (res) return res;
+
+    // 2. Try extracting content inside ```json ... ```
+    const markdownRegex = /```json\s*([\s\S]*?)\s*```/i;
+    let match = text.match(markdownRegex);
+    if (match) {
+        res = tryDecode(match[1]);
+        if (res) return res;
     }
+
+    // 3. Try extracting content inside ``` ... ```
+    const genericRegex = /```\s*([\s\S]*?)\s*```/i;
+    match = text.match(genericRegex);
+    if (match) {
+        res = tryDecode(match[1]);
+        if (res) return res;
+    }
+
+    // 4. Try finding first '{' and last '}'
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+        const candidate = text.substring(firstBrace, lastBrace + 1);
+        res = tryDecode(candidate);
+        if (res) return res;
+    }
+
     return null;
 }
 

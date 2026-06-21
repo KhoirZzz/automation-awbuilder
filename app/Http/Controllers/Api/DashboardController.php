@@ -536,21 +536,9 @@ class DashboardController extends Controller
                     $chatMessages
                 );
 
-                // Clean the response text from potential markdown block formatting
-                $cleaned = trim($response);
-                if (str_starts_with($cleaned, '```json')) {
-                    $cleaned = substr($cleaned, 7);
-                } elseif (str_starts_with($cleaned, '```')) {
-                    $cleaned = substr($cleaned, 3);
-                }
-                if (str_ends_with($cleaned, '```')) {
-                    $cleaned = substr($cleaned, 0, -3);
-                }
-                $cleaned = trim($cleaned);
+                $toolCall = $this->extractJsonFromText($response);
 
-                $toolCall = json_decode($cleaned, true);
-
-                if (json_last_error() === JSON_ERROR_NONE && is_array($toolCall) && isset($toolCall['status'])) {
+                if ($toolCall && is_array($toolCall) && isset($toolCall['status'])) {
                     if ($toolCall['status'] === 'read_file' || $toolCall['status'] === 'write_file') {
                         // It's a file tool call!
                         $toolOutput = $this->executeFileToolCall($toolCall);
@@ -731,6 +719,49 @@ class DashboardController extends Controller
         }
 
         return "ERROR: Unknown file tool status.";
+    }
+
+    /**
+     * Try to extract and decode a JSON object from text that might contain chat/markdown content.
+     */
+    private function extractJsonFromText(string $text): ?array
+    {
+        $text = trim($text);
+
+        // Try decoding direct text first
+        $decoded = json_decode($text, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return $decoded;
+        }
+
+        // Try extracting content between ```json and ```
+        if (preg_match('/```json\s*([\s\S]*?)\s*```/i', $text, $matches)) {
+            $decoded = json_decode(trim($matches[1]), true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        // Try extracting content between ``` and ```
+        if (preg_match('/```\s*([\s\S]*?)\s*```/i', $text, $matches)) {
+            $decoded = json_decode(trim($matches[1]), true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        // Fallback: search for first { and matching/last }
+        $firstBrace = strpos($text, '{');
+        $lastBrace = strrpos($text, '}');
+        if ($firstBrace !== false && $lastBrace !== false && $lastBrace > $firstBrace) {
+            $jsonCandidate = substr($text, $firstBrace, $lastBrace - $firstBrace + 1);
+            $decoded = json_decode(trim($jsonCandidate), true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
     }
 
     /**
