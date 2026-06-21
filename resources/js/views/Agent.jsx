@@ -168,64 +168,24 @@ export default function Agent() {
     };
 
     return (
-        <div className="space-y-8 font-mono text-xs">
-            <div>
-                <h1 className="text-xl font-bold text-white tracking-tight uppercase">Agent Control Center</h1>
-                <p className="text-zinc-500 text-xs mt-1">Configure system instructions and communicate directly with the AI Worker model.</p>
-            </div>
-
-            {/* Model Metadata Status Card */}
-            {config && (
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 border border-zinc-800 bg-zinc-950/60 p-4 rounded-lg">
-                    <div>
-                        <span className="text-zinc-500 block uppercase font-semibold text-[10px]">Active Worker Model</span>
-                        <span className="text-white font-bold block mt-0.5 text-sm tracking-tight">{config.model}</span>
+        <div className="font-mono text-xs">
+            <Card 
+                title="AI Worker Workspace"
+                action={
+                    <div className="flex gap-2">
+                        <Button size="sm" variant="secondary" onClick={() => {
+                            setTempPasskey(passkey);
+                            setLockModalOpen(true);
+                        }}>
+                            Passkey
+                        </Button>
+                        <Button size="sm" variant="secondary" onClick={handleClearChat} disabled={passkey.length < 6}>
+                            Clear History
+                        </Button>
                     </div>
-                    <div>
-                        <span className="text-zinc-500 block uppercase font-semibold text-[10px]">Gateway Connection</span>
-                        <span className="text-zinc-300 block mt-0.5 break-all">{config.api_url}</span>
-                    </div>
-                    <div className="flex flex-col justify-center">
-                        <span className="text-zinc-500 block uppercase font-semibold text-[10px] mb-1">Status</span>
-                        <div className="flex items-center gap-2">
-                            <span className={`h-2 w-2 rounded-full ${config.has_api_key ? 'bg-white' : 'bg-red-500'} animate-pulse`}></span>
-                            <span className="text-zinc-300 font-bold uppercase">
-                                {config.has_api_key ? 'Connected' : 'Disconnected'}
-                            </span>
-                        </div>
-                    </div>
-                    <div className="flex flex-col justify-center">
-                        <span className="text-zinc-500 block uppercase font-semibold text-[10px] mb-1">Passkey Akses</span>
-                        <div className="flex items-center gap-2 mt-1">
-                            <span className={`h-1.5 w-1.5 rounded-full ${passkey.length >= 6 ? 'bg-white animate-pulse' : 'bg-red-500'}`}></span>
-                            <span className="text-zinc-350 font-bold uppercase tracking-wider text-[10px]">
-                                {passkey.length >= 6 ? 'Authenticated' : 'Locked'}
-                            </span>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                {/* Chat Interactive Playground (Full Width) */}
-                <div className="lg:col-span-12 flex flex-col h-full">
-                    <Card 
-                        title="AI Worker Workspace"
-                        action={
-                            <div className="flex gap-2">
-                                <Button size="sm" variant="secondary" onClick={() => {
-                                    setTempPasskey(passkey);
-                                    setLockModalOpen(true);
-                                }}>
-                                    Passkey
-                                </Button>
-                                <Button size="sm" variant="secondary" onClick={handleClearChat} disabled={passkey.length < 6}>
-                                    Clear History
-                                </Button>
-                            </div>
-                        }
-                        className="flex flex-col h-[480px] lg:h-[600px]"
-                    >
+                }
+                className="flex flex-col h-[500px] lg:h-[650px]"
+            >
                         {/* Conversation Box */}
                         {passkey.length < 6 ? (
                             <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-900 rounded-lg p-8 text-center space-y-4 my-4">
@@ -250,7 +210,7 @@ export default function Agent() {
                                 </Button>
                             </div>
                         ) : (
-                             <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 h-[320px] min-h-[320px] max-h-[320px] lg:h-[440px] lg:min-h-[440px] lg:max-h-[440px] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                             <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 h-[340px] min-h-[340px] max-h-[340px] lg:h-[490px] lg:min-h-[490px] lg:max-h-[490px] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                                 {chatHistory.map((msg, index) => (
                                     <div 
                                         key={index} 
@@ -331,8 +291,6 @@ export default function Agent() {
                             </Button>
                         </form>
                     </Card>
-                </div>
-            </div>
 
             {/* Passkey Input Modal */}
             <Modal
