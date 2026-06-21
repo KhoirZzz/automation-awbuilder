@@ -58,5 +58,7 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::post('/deployments/file/rename', [DashboardController::class, 'renameDeploymentFileOrFolder']);
     Route::put('/deployments/file', [DashboardController::class, 'updateDeploymentFileContent']);
     Route::delete('/deployments/file', [DashboardController::class, 'deleteDeploymentFileOrFolder']);
+
+    Route::delete('/deployments/{id}', [DashboardController::class, 'destroyDeployment']);
 });
 

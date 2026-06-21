@@ -1653,6 +1653,28 @@ class DashboardController extends Controller
     }
 
     /**
+     * Delete a deployment record from database.
+     */
+    public function destroyDeployment($id): JsonResponse
+    {
+        $deployment = Deployment::findOrFail($id);
+
+        if ($deployment->status === DeploymentStatus::ACTIVE || $deployment->status === DeploymentStatus::PENDING) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Hanya deployment yang berstatus EXPIRED, FAILED, atau PENDING_PAYMENT yang dapat dihapus.'
+            ], 400);
+        }
+
+        $deployment->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Riwayat deployment berhasil dihapus.'
+        ]);
+    }
+
+    /**
      * Recursively set group-writable permissions on files and folders.
      */
     private function setPermissionsRecursive(string $path): void

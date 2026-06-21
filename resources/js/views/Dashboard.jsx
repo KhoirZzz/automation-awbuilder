@@ -304,6 +304,25 @@ export default function Dashboard({ onTriggerAgentEdit }) {
         }
     };
 
+    const handleDeleteDeployment = async (id) => {
+        if (!confirm('Apakah Anda yakin ingin menghapus riwayat deployment ini?')) return;
+        setActionLoading(id);
+        try {
+            const res = await fetch(`/api/dashboard/deployments/${id}`, { method: 'DELETE' });
+            const data = await res.json();
+            if (data.error) {
+                showBanner('error', data.error);
+            } else {
+                showBanner('success', 'Riwayat deployment berhasil dihapus.');
+                loadData();
+            }
+        } catch (e) {
+            showBanner('error', 'Gagal menghubungi server.');
+        } finally {
+            setActionLoading(null);
+        }
+    };
+
     const handleApprovePayment = async (id) => {
         const deployment = deployments.find(d => d.id === id);
         const currentPrice = deployment ? (deployment.price || '') : '';
@@ -568,26 +587,59 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                         </>
                                     )}
                                     {dep.status === 'failed' && (
+                                        <>
+                                            <Button 
+                                                size="sm" 
+                                                variant="warning"
+                                                className="flex-1 min-w-[80px]"
+                                                loading={actionLoading === dep.id}
+                                                onClick={() => handleRetry(dep.id)}
+                                            >
+                                                Retry
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="danger"
+                                                className="flex-1 min-w-[80px]"
+                                                loading={actionLoading === dep.id}
+                                                onClick={() => handleDeleteDeployment(dep.id)}
+                                            >
+                                                Hapus
+                                            </Button>
+                                        </>
+                                    )}
+                                    {dep.status === 'expired' && (
                                         <Button 
                                             size="sm" 
-                                            variant="warning"
+                                            variant="danger"
                                             className="w-full"
                                             loading={actionLoading === dep.id}
-                                            onClick={() => handleRetry(dep.id)}
+                                            onClick={() => handleDeleteDeployment(dep.id)}
                                         >
-                                            Retry
+                                            Hapus
                                         </Button>
                                     )}
                                     {dep.status === 'pending_payment' && (
-                                        <Button 
-                                            size="sm" 
-                                            variant="success"
-                                            className="w-full"
-                                            loading={actionLoading === dep.id}
-                                            onClick={() => handleApprovePayment(dep.id)}
-                                        >
-                                            Approve Payment
-                                        </Button>
+                                        <>
+                                            <Button 
+                                                size="sm" 
+                                                variant="success"
+                                                className="flex-1 min-w-[120px]"
+                                                loading={actionLoading === dep.id}
+                                                onClick={() => handleApprovePayment(dep.id)}
+                                            >
+                                                Approve Payment
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                variant="danger"
+                                                className="flex-1 min-w-[80px]"
+                                                loading={actionLoading === dep.id}
+                                                onClick={() => handleDeleteDeployment(dep.id)}
+                                            >
+                                                Hapus
+                                            </Button>
+                                        </>
                                     )}
                                 </div>
                             </div>
@@ -703,24 +755,54 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                                     </>
                                                 )}
                                                 {dep.status === 'failed' && (
+                                                    <>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="warning"
+                                                            loading={actionLoading === dep.id}
+                                                            onClick={() => handleRetry(dep.id)}
+                                                        >
+                                                            Retry
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="danger"
+                                                            loading={actionLoading === dep.id}
+                                                            onClick={() => handleDeleteDeployment(dep.id)}
+                                                        >
+                                                            Hapus
+                                                        </Button>
+                                                    </>
+                                                )}
+                                                {dep.status === 'expired' && (
                                                     <Button 
                                                         size="sm" 
-                                                        variant="warning"
+                                                        variant="danger"
                                                         loading={actionLoading === dep.id}
-                                                        onClick={() => handleRetry(dep.id)}
+                                                        onClick={() => handleDeleteDeployment(dep.id)}
                                                     >
-                                                        Retry
+                                                        Hapus
                                                     </Button>
                                                 )}
                                                 {dep.status === 'pending_payment' && (
-                                                    <Button 
-                                                        size="sm" 
-                                                        variant="success"
-                                                        loading={actionLoading === dep.id}
-                                                        onClick={() => handleApprovePayment(dep.id)}
-                                                    >
-                                                        Approve Payment
-                                                    </Button>
+                                                    <>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="success"
+                                                            loading={actionLoading === dep.id}
+                                                            onClick={() => handleApprovePayment(dep.id)}
+                                                        >
+                                                            Approve Payment
+                                                        </Button>
+                                                        <Button 
+                                                            size="sm" 
+                                                            variant="danger"
+                                                            loading={actionLoading === dep.id}
+                                                            onClick={() => handleDeleteDeployment(dep.id)}
+                                                        >
+                                                            Hapus
+                                                        </Button>
+                                                    </>
                                                 )}
                                             </div>
                                         </td>
