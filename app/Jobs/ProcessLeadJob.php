@@ -130,6 +130,16 @@ class ProcessLeadJob implements ShouldQueue
             // Send QRIS invoice and notify admin if ordered via Telegram bot
             if ($this->source === 'telegram' && $chatId) {
                 $qrisUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=qris_payment_mock_" . $analysisResult->clientSlug;
+                
+                // Auto-detect static QRIS image in public directory
+                if (file_exists(public_path('qris.png'))) {
+                    $qrisUrl = asset('qris.png');
+                } elseif (file_exists(public_path('qris.jpg'))) {
+                    $qrisUrl = asset('qris.jpg');
+                } elseif (file_exists(public_path('qris.jpeg'))) {
+                    $qrisUrl = asset('qris.jpeg');
+                }
+
                 $formattedPrice = $analysisResult->price ? 'Rp ' . number_format($analysisResult->price, 0, ',', '.') : 'Rp 100.000';
                 
                 $caption = "<b>📄 INVOICE PEMESANAN DEPLOYMENT</b>\n\nAplikasi Anda berhasil dikonfigurasi di VPS dan siap diaktifkan!\n\n• <b>Subdomain / Slug:</b> {$analysisResult->clientSlug}\n• <b>Durasi Sewa:</b> {$analysisResult->duration->value}\n• <b>Total Pembayaran:</b> {$formattedPrice}\n\nSilakan scan QRIS di atas untuk melakukan pembayaran.\nKirimkan bukti transfer pembayaran Anda ke Admin: <b>@awbuilderadmin</b>.\n\n<i>Aplikasi Anda akan segera diaktifkan dan link URL akan dikirim ke chat ini setelah pembayaran diverifikasi oleh Admin.</i>";
