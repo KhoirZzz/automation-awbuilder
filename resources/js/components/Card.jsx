@@ -2,7 +2,7 @@ import React from 'react';
 
 export const Card = ({ children, className = '', title, action }) => {
     return (
-        <div className={`bg-zinc-950 border border-zinc-800 rounded-lg shadow-sm p-6 ${className}`}>
+        <div className={`bg-zinc-950 border border-zinc-800 rounded-lg shadow-sm p-4 md:p-6 ${className}`}>
             {(title || action) && (
                 <div className="flex items-center justify-between mb-5 border-b border-zinc-800 pb-4">
                     {title && <h3 className="font-semibold text-base text-zinc-100 tracking-tight">{title}</h3>}

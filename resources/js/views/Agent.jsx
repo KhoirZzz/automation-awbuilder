@@ -224,7 +224,7 @@ export default function Agent() {
                                 </Button>
                             </div>
                         }
-                        className="flex flex-col h-[600px]"
+                        className="flex flex-col h-[480px] lg:h-[600px]"
                     >
                         {/* Conversation Box */}
                         {passkey.length < 6 ? (
@@ -250,7 +250,7 @@ export default function Agent() {
                                 </Button>
                             </div>
                         ) : (
-                            <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 h-[440px] min-h-[440px] max-h-[440px] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
+                             <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 h-[320px] min-h-[320px] max-h-[320px] lg:h-[440px] lg:min-h-[440px] lg:max-h-[440px] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
                                 {chatHistory.map((msg, index) => (
                                     <div 
                                         key={index} 
