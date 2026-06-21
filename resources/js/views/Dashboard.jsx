@@ -36,6 +36,8 @@ export default function Dashboard({ onTriggerAgentEdit }) {
     const [fmNewType, setFmNewType] = useState('file'); // 'file' or 'folder'
     const [fmNewName, setFmNewName] = useState('');
     const [fmNewInputOpen, setFmNewInputOpen] = useState(false);
+    const [fmRenamingItem, setFmRenamingItem] = useState(null);
+    const [fmRenameValue, setFmRenameValue] = useState('');
 
     const openFileManager = (deployment) => {
         setFmDeployment(deployment);
@@ -43,6 +45,8 @@ export default function Dashboard({ onTriggerAgentEdit }) {
         setFmFiles([]);
         setFmSelectedFile(null);
         setFmContent('');
+        setFmRenamingItem(null);
+        setFmRenameValue('');
         setFmOpen(true);
         loadFmFiles(deployment.client_slug, '');
     };
@@ -166,6 +170,54 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                 loadFmFiles(fmDeployment.client_slug, fmPath);
             } else {
                 showBanner('error', data.error || 'Gagal menghapus file/folder.');
+            }
+        } catch (e) {
+            showBanner('error', 'Gagal menghubungi server.');
+        }
+    };
+
+    const startRenameFmItem = (item, e) => {
+        e.stopPropagation();
+        setFmRenamingItem(item);
+        setFmRenameValue(item.name);
+    };
+
+    const submitRenameFmItem = async () => {
+        if (!fmRenamingItem || !fmRenameValue.trim() || fmRenameValue.trim() === fmRenamingItem.name) {
+            setFmRenamingItem(null);
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/dashboard/deployments/file/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    client_slug: fmDeployment.client_slug,
+                    path: fmRenamingItem.path,
+                    new_name: fmRenameValue.trim()
+                })
+            });
+            const data = await res.json();
+            if (res.status === 200 && data.success) {
+                showBanner('success', 'Berhasil mengubah nama file/folder.');
+                
+                // If the selected file was renamed, update its reference
+                if (fmSelectedFile && fmSelectedFile.path === fmRenamingItem.path) {
+                    const newPath = fmRenamingItem.path.includes('/')
+                        ? fmRenamingItem.path.substring(0, fmRenamingItem.path.lastIndexOf('/')) + '/' + fmRenameValue.trim()
+                        : fmRenameValue.trim();
+                    setFmSelectedFile({
+                        ...fmSelectedFile,
+                        name: fmRenameValue.trim(),
+                        path: newPath
+                    });
+                }
+                
+                setFmRenamingItem(null);
+                loadFmFiles(fmDeployment.client_slug, fmPath);
+            } else {
+                showBanner('error', data.error || 'Gagal mengubah nama.');
             }
         } catch (e) {
             showBanner('error', 'Gagal menghubungi server.');
@@ -827,6 +879,44 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                     ) : (
                                         fmFiles.map((file) => {
                                             const isSelected = fmSelectedFile && fmSelectedFile.path === file.path;
+                                            const isRenaming = fmRenamingItem && fmRenamingItem.path === file.path;
+                                            
+                                            if (isRenaming) {
+                                                return (
+                                                    <div 
+                                                        key={file.path}
+                                                        className="flex items-center gap-1.5 p-1 rounded border border-zinc-700 bg-zinc-900"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <input 
+                                                            type="text"
+                                                            value={fmRenameValue}
+                                                            onChange={(e) => setFmRenameValue(e.target.value)}
+                                                            className="flex-1 bg-zinc-950 border border-zinc-800 rounded px-1.5 py-0.5 text-white font-mono text-[10px] focus:outline-none focus:border-zinc-500"
+                                                            autoFocus
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') submitRenameFmItem();
+                                                                if (e.key === 'Escape') setFmRenamingItem(null);
+                                                            }}
+                                                        />
+                                                        <button 
+                                                            onClick={submitRenameFmItem}
+                                                            className="text-green-500 hover:text-green-400 font-bold text-[10px] px-1"
+                                                            title="Save Rename"
+                                                        >
+                                                            ✓
+                                                        </button>
+                                                        <button 
+                                                            onClick={() => setFmRenamingItem(null)}
+                                                            className="text-red-500 hover:text-red-400 font-bold text-[10px] px-1"
+                                                            title="Cancel"
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                );
+                                            }
+
                                             return (
                                                 <div 
                                                     key={file.path}
@@ -848,6 +938,13 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                                                 {(file.size / 1024).toFixed(1)} KB
                                                             </span>
                                                         )}
+                                                        <button 
+                                                            onClick={(e) => startRenameFmItem(file, e)}
+                                                            className="text-zinc-650 hover:text-white font-semibold text-[10px] md:opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                                                            title={`Rename ${file.name}`}
+                                                        >
+                                                            ✏️
+                                                        </button>
                                                         <button 
                                                             onClick={(e) => deleteFmItem(file, e)}
                                                             className="text-zinc-650 hover:text-red-500 font-semibold text-[10px] md:opacity-0 group-hover:opacity-100 transition-opacity p-0.5"

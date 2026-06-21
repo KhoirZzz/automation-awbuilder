@@ -55,6 +55,7 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::get('/deployments/files', [DashboardController::class, 'listDeploymentFiles']);
     Route::get('/deployments/file/content', [DashboardController::class, 'getDeploymentFileContent']);
     Route::post('/deployments/file', [DashboardController::class, 'createDeploymentFileOrFolder']);
+    Route::post('/deployments/file/rename', [DashboardController::class, 'renameDeploymentFileOrFolder']);
     Route::put('/deployments/file', [DashboardController::class, 'updateDeploymentFileContent']);
     Route::delete('/deployments/file', [DashboardController::class, 'deleteDeploymentFileOrFolder']);
 });

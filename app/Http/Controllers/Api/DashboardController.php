@@ -1575,6 +1575,53 @@ class DashboardController extends Controller
     }
 
     /**
+     * Rename file or folder inside a client deployment.
+     */
+    public function renameDeploymentFileOrFolder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'client_slug' => 'required|string',
+            'path' => 'required|string',
+            'new_name' => 'required|string|regex:/^[a-zA-Z0-9._-]+$/'
+        ]);
+
+        $oldPath = $this->resolveDeploymentPath($validated['client_slug'], $validated['path']);
+        if (!$oldPath || !File::exists($oldPath)) {
+            return response()->json(['error' => 'File or folder not found.'], 404);
+        }
+
+        // Security check: cannot rename the root of deployment path
+        $basePath = $this->resolveDeploymentPath($validated['client_slug']);
+        if ($oldPath === $basePath) {
+            return response()->json(['error' => 'Cannot rename deployment root directory.'], 400);
+        }
+
+        // Determine new path
+        $dir = dirname($oldPath);
+        $newPath = $dir . '/' . $validated['new_name'];
+
+        // Security check on new path
+        $realDir = realpath($dir);
+        if (!$realDir || !str_starts_with($realDir, $basePath)) {
+            return response()->json(['error' => 'Invalid path target.'], 400);
+        }
+
+        if (File::exists($newPath)) {
+            return response()->json(['error' => 'A file or folder with the new name already exists.'], 400);
+        }
+
+        File::move($oldPath, $newPath);
+
+        // Refresh permissions
+        $this->setPermissionsRecursive($newPath);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Renamed successfully.'
+        ]);
+    }
+
+    /**
      * Recursively set group-writable permissions on files and folders.
      */
     private function setPermissionsRecursive(string $path): void
