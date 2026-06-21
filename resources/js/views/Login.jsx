@@ -44,9 +44,11 @@ export default function Login() {
                 
                 {/* Header */}
                 <div className="text-center space-y-2">
-                    <div className="h-10 w-10 bg-white rounded flex items-center justify-center text-black font-extrabold text-sm tracking-tighter mx-auto">
-                        AD
-                    </div>
+                    <img 
+                        src="/logo/awbuilder.png" 
+                        alt="AWBuilder" 
+                        className="h-10 w-10 object-contain rounded mx-auto"
+                    />
                     <h2 className="text-zinc-100 font-bold uppercase tracking-widest text-xs mt-3">AWBuilder Control</h2>
                     <p className="text-zinc-550 text-[10px]">Autodeployment System Admin Gateway</p>
                 </div>

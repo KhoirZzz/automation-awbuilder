@@ -98,9 +98,11 @@ function App() {
             {/* Top Bar for Mobile/Tablet */}
             <header className="lg:hidden flex items-center justify-between px-4 py-4 bg-zinc-950 border-b border-zinc-900 sticky top-0 z-30">
                 <div className="flex items-center gap-2.5">
-                    <div className="h-7 w-7 bg-white rounded flex items-center justify-center text-black font-extrabold text-xs tracking-tighter">
-                        AD
-                    </div>
+                    <img 
+                        src="/logo/awbuilder.png" 
+                        alt="AWBuilder" 
+                        className="h-7 w-7 object-contain rounded"
+                    />
                     <div>
                         <span className="font-bold text-zinc-100 tracking-tight text-xs uppercase block font-mono">AUTODEPLOY</span>
                     </div>
@@ -145,9 +147,11 @@ function App() {
             {/* Sidebar Navigation for Desktop */}
             <aside className="hidden lg:flex w-64 bg-black border-r border-zinc-800 px-6 py-8 flex-col gap-8 shrink-0">
                 <div className="flex items-center gap-3">
-                    <div className="h-8 w-8 bg-white rounded flex items-center justify-center text-black font-extrabold text-sm tracking-tighter">
-                        AD
-                    </div>
+                    <img 
+                        src="/logo/awbuilder.png" 
+                        alt="AWBuilder" 
+                        className="h-8 w-8 object-contain rounded"
+                    />
                     <div>
                         <span className="font-bold text-zinc-100 tracking-tight text-sm uppercase block font-mono">AUTODEPLOY</span>
                         <span className="text-[9px] text-zinc-500 font-mono tracking-widest uppercase block -mt-1">SYSTEM CONTROLLER</span>
