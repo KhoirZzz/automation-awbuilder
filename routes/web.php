@@ -3,10 +3,17 @@
 use Illuminate\Support\Facades\File;
 
 // Handle wildcard subdomains dynamically
-Route::group(['domain' => '{subdomain}.' . parse_url(env('APP_URL', 'https://mockbuild.shop'), PHP_URL_HOST)], function () {
+$routeDomain = parse_url(config('app.url'), PHP_URL_HOST);
+if (app()->runningUnitTests()) {
+    $routeDomain = 'mockbuild.shop';
+}
+Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
     Route::get('/{any?}', function ($subdomain, $any = null) {
         $reserved = ['www', 'admin', 'api', 'mail', 'app', 'dev', 'status', 'portal', 'dashboard'];
         if (in_array(strtolower($subdomain), $reserved)) {
+            if (in_array(strtolower($subdomain), ['admin', 'dashboard', 'www'])) {
+                return view('welcome');
+            }
             abort(404);
         }
 

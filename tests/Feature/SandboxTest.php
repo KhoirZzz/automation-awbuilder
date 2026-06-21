@@ -119,4 +119,21 @@ class SandboxTest extends TestCase
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('templates/gojek'));
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
     }
+
+    public function test_reserved_subdomains_behavior(): void
+    {
+        config(['app.url' => 'https://mockbuild.shop']);
+
+        // admin.mockbuild.shop should serve welcome (200 OK)
+        $responseAdmin = $this->get('http://admin.mockbuild.shop/');
+        $responseAdmin->assertStatus(200);
+
+        // www.mockbuild.shop should serve welcome (200 OK)
+        $responseWww = $this->get('http://www.mockbuild.shop/');
+        $responseWww->assertStatus(200);
+
+        // mail.mockbuild.shop should return 404
+        $responseMail = $this->get('http://mail.mockbuild.shop/');
+        $responseMail->assertStatus(404);
+    }
 }
