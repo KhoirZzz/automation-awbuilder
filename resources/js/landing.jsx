@@ -158,7 +158,9 @@ function Landing() {
                                     </div>
                                     <div className="flex justify-between pt-1">
                                         <span className="text-white font-semibold">Total Pembayaran:</span>
-                                        <span className="text-white font-extrabold text-sm">{getPrice(durasi).formatted}</span>
+                                        <span className="text-white font-extrabold text-xs">
+                                            {checkoutResult.price ? `Rp ${Number(checkoutResult.price).toLocaleString('id-ID')}` : 'Menunggu konfirmasi Admin (Hubungi @awbuilderadmin)'}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -279,11 +281,11 @@ function Landing() {
                                                 onChange={(e) => setDurasi(e.target.value)}
                                                 className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2.5 text-white focus:outline-none focus:border-zinc-500 font-mono"
                                             >
-                                                <option value="1_minggu">1 Minggu ({getPrice('1_minggu').formatted})</option>
-                                                <option value="1_bulan">1 Bulan ({getPrice('1_bulan').formatted})</option>
-                                                <option value="3_bulan">3 Bulan ({getPrice('3_bulan').formatted})</option>
-                                                <option value="6_bulan">6 Bulan ({getPrice('6_bulan').formatted})</option>
-                                                <option value="1_tahun">1 Tahun ({getPrice('1_tahun').formatted})</option>
+                                                <option value="1_minggu">1 Minggu</option>
+                                                <option value="1_bulan">1 Bulan</option>
+                                                <option value="3_bulan">3 Bulan</option>
+                                                <option value="6_bulan">6 Bulan</option>
+                                                <option value="1_tahun">1 Tahun</option>
                                             </select>
                                         </div>
 
@@ -330,8 +332,8 @@ function Landing() {
 
                                         <div className="pt-2 border-t border-zinc-900 flex justify-between items-center">
                                             <div>
-                                                <span className="text-[10px] text-zinc-500 block uppercase">Estimasi Biaya</span>
-                                                <span className="text-white font-extrabold text-sm">{getPrice(durasi).formatted}</span>
+                                                <span className="text-[10px] text-zinc-500 block uppercase">Biaya Layanan</span>
+                                                <span className="text-white font-extrabold text-xs">Menunggu konfirmasi Admin (Hubungi @awbuilderadmin)</span>
                                             </div>
                                             <Button type="submit" variant="primary" loading={loading} className="uppercase font-bold tracking-wider text-xs">
                                                 Pesan & Deploy Layanan

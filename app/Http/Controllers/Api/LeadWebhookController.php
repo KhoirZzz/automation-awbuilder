@@ -32,8 +32,7 @@ class LeadWebhookController extends Controller
             return response()->json(['status' => 'received']);
         }
 
-        // 2. Handle Admin Payment Approval command: `/approve <client_slug_or_id>`
-        if (preg_match('/^\/approve\s+(\S+)/i', $messageText, $matches)) {
+        if (preg_match('/^\/approve\s+(\S+)(?:\s+(\d+))?/i', $messageText, $matches)) {
             $adminChatId = env('TELEGRAM_ADMIN_CHAT_ID');
             if (empty($adminChatId) || (string)$chatId !== (string)$adminChatId) {
                 $botService->sendMessage($chatId, "❌ Anda tidak memiliki otorisasi untuk melakukan tindakan ini.");
@@ -41,6 +40,7 @@ class LeadWebhookController extends Controller
             }
 
             $target = $matches[1];
+            $priceInput = $matches[2] ?? null;
             $deployment = \App\Models\Deployment::where('client_slug', $target)
                 ->orWhere('id', $target)
                 ->first();
@@ -55,8 +55,12 @@ class LeadWebhookController extends Controller
                 return response()->json(['status' => 'received']);
             }
 
-            // Update status to active
-            $deployment->update(['status' => \App\Enums\DeploymentStatus::ACTIVE]);
+            // Update status and optional price
+            $updateData = ['status' => \App\Enums\DeploymentStatus::ACTIVE];
+            if ($priceInput !== null) {
+                $updateData['price'] = (int)$priceInput;
+            }
+            $deployment->update($updateData);
 
             // Reconstruct final client URL
             $baseDomain = 'mockbuild.shop';

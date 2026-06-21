@@ -238,7 +238,7 @@ class DashboardController extends Controller
     /**
      * Approve payment for a deployment pending payment.
      */
-    public function approve($id, \App\Services\TelegramBotService $botService): JsonResponse
+    public function approve($id, Request $request, \App\Services\TelegramBotService $botService): JsonResponse
     {
         $deployment = Deployment::findOrFail($id);
 
@@ -246,7 +246,13 @@ class DashboardController extends Controller
             return response()->json(['error' => 'Only deployments pending payment can be approved.'], 400);
         }
 
-        $deployment->update(['status' => DeploymentStatus::ACTIVE]);
+        $price = $request->input('price');
+        $updateData = ['status' => DeploymentStatus::ACTIVE];
+        if ($price !== null && $price !== '') {
+            $updateData['price'] = (int)$price;
+        }
+
+        $deployment->update($updateData);
 
         // Construct final URL
         $baseDomain = 'mockbuild.shop';
@@ -1001,13 +1007,7 @@ class DashboardController extends Controller
         }
 
         // Calculate standard price based on duration
-        $price = match ($durationEnum) {
-            \App\Enums\ServiceDuration::ONE_WEEK => 50000,
-            \App\Enums\ServiceDuration::ONE_MONTH => 150000,
-            \App\Enums\ServiceDuration::THREE_MONTHS => 400000,
-            \App\Enums\ServiceDuration::SIX_MONTHS => 750000,
-            \App\Enums\ServiceDuration::ONE_YEAR => 1200000,
-        };
+        $price = null;
 
         // Build DTO
         $result = new \App\DataTransferObjects\LeadAnalysisResult(
@@ -1041,8 +1041,7 @@ class DashboardController extends Controller
             if ($adminChatId) {
                 try {
                     $botService = app(\App\Services\TelegramBotService::class);
-                    $formattedPrice = 'Rp ' . number_format($price, 0, ',', '.');
-                    $botService->sendMessage($adminChatId, "<b>🔔 PEMESANAN WEB BARU MENUNGGU PERSETUJUAN</b>\n\n• Source: <b>Web Checkout</b>\n• Subdomain: <b>{$clientSlug}</b>\n• Durasi Sewa: <b>{$durationEnum->value}</b>\n• Harga: <b>{$formattedPrice}</b>\n\nSilakan verifikasi bukti pembayaran QRIS dari client lalu approve di dashboard atau ketik:\n<code>/approve {$clientSlug}</code>");
+                    $botService->sendMessage($adminChatId, "<b>🔔 PEMESANAN WEB BARU MENUNGGU PERSETUJUAN</b>\n\n• Source: <b>Web Checkout</b>\n• Subdomain: <b>{$clientSlug}</b>\n• Durasi Sewa: <b>{$durationEnum->value}</b>\n• Harga: <b>Belum Ditetapkan</b>\n\nSilakan verifikasi bukti pembayaran QRIS dari client, lalu approve di dashboard atau ketik:\n<code>/approve {$clientSlug} &lt;nominal_harga&gt;</code>");
                 } catch (\Exception $ex) {
                     \Illuminate\Support\Facades\Log::error('Failed to send telegram admin notification: ' . $ex->getMessage());
                 }

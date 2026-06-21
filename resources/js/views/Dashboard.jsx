@@ -96,10 +96,19 @@ export default function Dashboard({ onTriggerAgentEdit }) {
     };
 
     const handleApprovePayment = async (id) => {
-        if (!confirm('Verify payment proof and approve this deployment?')) return;
+        const deployment = deployments.find(d => d.id === id);
+        const currentPrice = deployment ? (deployment.price || '') : '';
+        
+        const priceInput = prompt('Konfirmasi nominal pembayaran (Rupiah) untuk diaktifkan:', currentPrice || '150000');
+        if (priceInput === null) return; // Cancelled
+
         setActionLoading(id);
         try {
-            const res = await fetch(`/api/dashboard/deployments/${id}/approve`, { method: 'POST' });
+            const res = await fetch(`/api/dashboard/deployments/${id}/approve`, { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ price: priceInput })
+            });
             const data = await res.json();
             if (data.error) {
                 showBanner('error', data.error);

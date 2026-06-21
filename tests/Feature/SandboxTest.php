@@ -199,14 +199,14 @@ class SandboxTest extends TestCase
         $response->assertStatus(200);
         $response->assertJson([
             'success' => true,
-            'price' => 150000
+            'price' => null
         ]);
 
         // Assert deployment database entry exists as pending_payment
         $this->assertDatabaseHas('deployments', [
             'client_slug' => 'pubslugtest',
             'status' => \App\Enums\DeploymentStatus::PENDING_PAYMENT->value,
-            'price' => 150000
+            'price' => null
         ]);
 
         // Clean up directories
