@@ -307,7 +307,7 @@ export default function Agent({ prefilledMessage, clearPrefilledMessage }) {
                         )}
 
                         {/* Message Input Form */}
-                        <form onSubmit={handleSend} className="mt-auto border-t border-zinc-900 pt-4 flex gap-2">
+                        <form onSubmit={handleSend} className="mt-auto border-t border-zinc-900 pt-4 pb-16 md:pb-0 flex gap-2">
                             <input
                                 type="text"
                                 value={userMessage}

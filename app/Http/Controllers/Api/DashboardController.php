@@ -707,11 +707,13 @@ class DashboardController extends Controller
 
             $dirPath = dirname($targetPath);
             if (!File::isDirectory($dirPath)) {
-                File::makeDirectory($dirPath, 0755, true);
+                File::makeDirectory($dirPath, 0775, true);
+                @chmod($dirPath, 0775);
             }
 
             if (empty($targetBlock)) {
                 File::put($targetPath, $content);
+                @chmod($targetPath, 0664);
                 return "SUCCESS: File '{$filePath}' has been fully overwritten/created successfully.";
             } else {
                 if (!File::exists($targetPath)) {
@@ -723,6 +725,7 @@ class DashboardController extends Controller
                 }
                 $newContent = str_replace($targetBlock, $content, $existingContent);
                 File::put($targetPath, $newContent);
+                @chmod($targetPath, 0664);
                 return "SUCCESS: Target block in file '{$filePath}' has been replaced successfully.";
             }
         }
