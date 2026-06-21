@@ -308,4 +308,33 @@ class TemplateZipTest extends TestCase
             'error' => 'File ZIP tidak ditemukan.'
         ]);
     }
+
+    public function test_list_files_includes_hidden_files(): void
+    {
+        // 1. Create template
+        $template = ServiceTemplate::create([
+            'key' => 'list-files-test',
+            'name' => 'List Files Test',
+            'template_path' => 'list-files-folder',
+            'is_active' => true
+        ]);
+
+        // 2. Create template directory with files, subfolders, and hidden files
+        $folderPath = $this->templateDir . '/list-files-folder';
+        File::makeDirectory($folderPath, 0755, true);
+        File::put($folderPath . '/index.html', 'dummy index');
+        File::put($folderPath . '/.htaccess', 'dummy htaccess');
+        File::put($folderPath . '/imm.php', 'dummy php');
+        File::makeDirectory($folderPath . '/config', 0755, true);
+
+        // 3. Request listing
+        $response = $this->getJson('/api/dashboard/templates/files?template_key=list-files-test', [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJsonCount(4); // index.html, .htaccess, imm.php, config
+        $response->assertJsonFragment(['name' => '.htaccess']);
+        $response->assertJsonFragment(['name' => 'imm.php']);
+    }
 }

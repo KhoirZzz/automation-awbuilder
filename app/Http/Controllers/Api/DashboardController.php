@@ -1176,7 +1176,7 @@ class DashboardController extends Controller
             return response()->json(['error' => 'Directory not found or invalid.'], 404);
         }
 
-        $files = File::files($targetPath);
+        $files = File::files($targetPath, true);
         $directories = File::directories($targetPath);
         
         $result = [];
