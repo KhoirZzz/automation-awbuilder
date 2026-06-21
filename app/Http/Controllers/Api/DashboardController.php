@@ -67,6 +67,41 @@ class DashboardController extends Controller
     }
 
     /**
+     * Delete a service template and its files.
+     */
+    public function destroyTemplate($id): JsonResponse
+    {
+        $template = ServiceTemplate::findOrFail($id);
+
+        if ($template->deployments()->count() > 0) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Template tidak dapat dihapus karena memiliki riwayat/aktif deployment.'
+            ], 400);
+        }
+
+        $templateBasePath = config('deploy.template_base_path');
+        if (!empty($template->template_path)) {
+            $dirToDelete = $templateBasePath . '/' . $template->template_path;
+            // Security check: must be inside templateBasePath, cannot be empty or root templateBasePath
+            if ($template->template_path !== '.' && $template->template_path !== '/' && File::isDirectory($dirToDelete)) {
+                $realDir = realpath($dirToDelete);
+                $realBase = realpath($templateBasePath);
+                if ($realDir && $realBase && str_starts_with($realDir, $realBase) && $realDir !== $realBase) {
+                    File::deleteDirectory($dirToDelete);
+                }
+            }
+        }
+
+        $template->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Template berhasil dihapus.'
+        ]);
+    }
+
+    /**
      * Create a new template.
      */
     public function storeTemplate(Request $request): JsonResponse

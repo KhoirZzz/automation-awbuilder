@@ -25,6 +25,7 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::get('/templates', [DashboardController::class, 'templates']);
     Route::post('/templates', [DashboardController::class, 'storeTemplate']);
     Route::post('/templates/{id}/toggle', [DashboardController::class, 'toggleTemplate']);
+    Route::delete('/templates/{id}', [DashboardController::class, 'destroyTemplate']);
     Route::post('/deployments/{id}/teardown', [DashboardController::class, 'teardown']);
     Route::post('/deployments/{id}/extend', [DashboardController::class, 'extend']);
     Route::post('/deployments/{id}/retry', [DashboardController::class, 'retry']);

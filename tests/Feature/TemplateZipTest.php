@@ -141,4 +141,79 @@ class TemplateZipTest extends TestCase
 
         $response->assertStatus(422); // Validation error
     }
+
+    public function test_delete_template_success(): void
+    {
+        // 1. Create a template record
+        $template = ServiceTemplate::create([
+            'key' => 'delete-me',
+            'name' => 'Delete Me Template',
+            'template_path' => 'delete-me-folder',
+            'is_active' => true
+        ]);
+
+        // 2. Create the dummy template folder on disk
+        $folderPath = $this->templateDir . '/delete-me-folder';
+        File::makeDirectory($folderPath, 0755, true);
+        File::put($folderPath . '/index.html', 'content');
+
+        // 3. Make the API delete request
+        $response = $this->deleteJson('/api/dashboard/templates/' . $template->id, [], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'message' => 'Template berhasil dihapus.'
+        ]);
+
+        // 4. Verify template removed from DB
+        $this->assertDatabaseMissing('service_templates', [
+            'id' => $template->id
+        ]);
+
+        // 5. Verify folder deleted on disk
+        $this->assertDirectoryDoesNotExist($folderPath);
+    }
+
+    public function test_delete_template_fails_if_has_deployments(): void
+    {
+        // 1. Create template
+        $template = ServiceTemplate::create([
+            'key' => 'keep-me',
+            'name' => 'Keep Me Template',
+            'template_path' => 'keep-me-folder',
+            'is_active' => true
+        ]);
+
+        // 2. Create associated deployment
+        \App\Models\Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => '9999',
+            'service_template_id' => $template->id,
+            'client_slug' => 'active-slug',
+            'instance_path' => storage_path('app/deployments/active-slug'),
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+            'status' => \App\Enums\DeploymentStatus::ACTIVE,
+            'price' => 50000,
+        ]);
+
+        // 3. Request deletion
+        $response = $this->deleteJson('/api/dashboard/templates/' . $template->id, [], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(400);
+        $response->assertJson([
+            'success' => false,
+            'error' => 'Template tidak dapat dihapus karena memiliki riwayat/aktif deployment.'
+        ]);
+
+        // 4. Verify template still in DB
+        $this->assertDatabaseHas('service_templates', [
+            'id' => $template->id
+        ]);
+    }
 }

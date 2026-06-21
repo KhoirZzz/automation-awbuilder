@@ -73,6 +73,26 @@ export default function Templates() {
         }
     };
 
+    const handleDelete = async (id, name) => {
+        if (!confirm(`Apakah Anda yakin ingin menghapus blueprint "${name}"? Tindakan ini juga akan menghapus folder template dari penyimpanan.`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch(`/api/dashboard/templates/${id}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (res.status === 200 && data.success) {
+                fetchTemplates();
+            } else {
+                alert(data.error || 'Gagal menghapus template.');
+            }
+        } catch (e) {
+            alert('Gagal menghapus template. Hubungi administrator.');
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -288,16 +308,28 @@ export default function Templates() {
                                             <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider block">Template Folder Name</span>
                                             <span className="text-zinc-300 font-mono text-xs">{tpl.template_path}</span>
                                         </div>
-                                        <div className="pt-4 border-t border-zinc-900 flex items-center justify-between">
-                                            <span className="text-zinc-500 text-xs">LLM Active?</span>
-                                            <Button 
-                                                size="sm" 
-                                                variant={tpl.is_active ? 'secondary' : 'success'}
-                                                onClick={() => handleToggle(tpl.id)}
-                                            >
-                                                {tpl.is_active ? 'Deactivate' : 'Activate'}
-                                            </Button>
-                                        </div>
+                                         <div className="pt-4 border-t border-zinc-900 flex flex-col gap-3">
+                                             <div className="flex items-center justify-between">
+                                                 <span className="text-zinc-500 text-xs">LLM Active?</span>
+                                                 <Button 
+                                                     size="sm" 
+                                                     variant={tpl.is_active ? 'secondary' : 'success'}
+                                                     onClick={() => handleToggle(tpl.id)}
+                                                 >
+                                                     {tpl.is_active ? 'Deactivate' : 'Activate'}
+                                                 </Button>
+                                             </div>
+                                             <div className="flex items-center justify-end">
+                                                 <Button 
+                                                     size="sm" 
+                                                     variant="secondary"
+                                                     className="hover:bg-zinc-800 hover:text-white border-zinc-800 text-zinc-400 font-semibold font-mono"
+                                                     onClick={() => handleDelete(tpl.id, tpl.name)}
+                                                 >
+                                                     Delete Blueprint
+                                                 </Button>
+                                             </div>
+                                         </div>
                                     </div>
                                 </Card>
                             ))}
