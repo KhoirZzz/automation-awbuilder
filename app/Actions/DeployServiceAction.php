@@ -72,7 +72,8 @@ class DeployServiceAction
 
             // Ensure base instances path exists
             if (!File::isDirectory($instanceBasePath)) {
-                File::makeDirectory($instanceBasePath, 0755, true);
+                File::makeDirectory($instanceBasePath, 0775, true);
+                @chmod($instanceBasePath, 0775);
             }
 
             // 2. Clone template (filesystem copy) or create empty directory
@@ -87,7 +88,8 @@ class DeployServiceAction
                 Log::channel('deploy-audit')->info('Creating empty instance directory for blank template...', [
                     'to' => $instancePath
                 ]);
-                File::makeDirectory($instancePath, 0755, true);
+                File::makeDirectory($instancePath, 0775, true);
+                @chmod($instancePath, 0775);
             } else {
                 Log::channel('deploy-audit')->info('Copying template directory...', [
                     'from' => $templatePath,
@@ -191,6 +193,7 @@ class DeployServiceAction
             }
 
             // 5. Success finalization
+            $this->setPermissionsRecursive($instancePath);
             $finalStatus = ($result->source === 'telegram') ? DeploymentStatus::PENDING_PAYMENT : DeploymentStatus::ACTIVE;
             $deployment->update([
                 'status' => $finalStatus,
@@ -245,6 +248,31 @@ class DeployServiceAction
             ], 600);
 
             throw $e;
+        }
+    }
+
+    /**
+     * Recursively set group-writable permissions on files and folders.
+     */
+    private function setPermissionsRecursive(string $path): void
+    {
+        try {
+            if (!File::exists($path)) {
+                return;
+            }
+            if (File::isDirectory($path)) {
+                @chmod($path, 0775);
+                foreach (File::allFiles($path) as $file) {
+                    @chmod($file->getRealPath(), 0664);
+                }
+                foreach (File::allDirectories($path) as $dir) {
+                    @chmod($dir, 0775);
+                }
+            } else {
+                @chmod($path, 0664);
+            }
+        } catch (\Throwable $e) {
+            // Silence permission errors
         }
     }
 }

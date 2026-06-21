@@ -874,15 +874,18 @@ class DashboardController extends Controller
 
         try {
             if (!File::isDirectory($templateBaseDir)) {
-                File::makeDirectory($templateBaseDir, 0755, true);
+                File::makeDirectory($templateBaseDir, 0775, true);
+                @chmod($templateBaseDir, 0775);
             }
 
             // Extract using ZipArchive
             $zip = new \ZipArchive;
             if ($zip->open($filePath) === TRUE) {
-                File::makeDirectory($destinationFolder, 0755, true);
+                File::makeDirectory($destinationFolder, 0775, true);
+                @chmod($destinationFolder, 0775);
                 $zip->extractTo($destinationFolder);
                 $zip->close();
+                $this->setPermissionsRecursive($destinationFolder);
             } else {
                 return response()->json(['error' => 'Failed to open ZIP archive.'], 500);
             }
@@ -1261,15 +1264,18 @@ class DashboardController extends Controller
         }
 
         if ($validated['is_dir']) {
-            File::makeDirectory($targetPath, 0755, true);
+            File::makeDirectory($targetPath, 0775, true);
+            @chmod($targetPath, 0775);
             $message = 'Folder created successfully.';
         } else {
             // Ensure parent directory exists
             $parentDir = dirname($targetPath);
             if (!File::isDirectory($parentDir)) {
-                File::makeDirectory($parentDir, 0755, true);
+                File::makeDirectory($parentDir, 0775, true);
+                @chmod($parentDir, 0775);
             }
             File::put($targetPath, $validated['content'] ?? '');
+            @chmod($targetPath, 0664);
             $message = 'File created successfully.';
         }
 
@@ -1296,6 +1302,7 @@ class DashboardController extends Controller
         }
 
         File::put($targetPath, $validated['content']);
+        @chmod($targetPath, 0664);
 
         return response()->json([
             'success' => true,
@@ -1334,5 +1341,30 @@ class DashboardController extends Controller
             'success' => true,
             'message' => 'Deleted successfully.'
         ]);
+    }
+
+    /**
+     * Recursively set group-writable permissions on files and folders.
+     */
+    private function setPermissionsRecursive(string $path): void
+    {
+        try {
+            if (!File::exists($path)) {
+                return;
+            }
+            if (File::isDirectory($path)) {
+                @chmod($path, 0775);
+                foreach (File::allFiles($path) as $file) {
+                    @chmod($file->getRealPath(), 0664);
+                }
+                foreach (File::allDirectories($path) as $dir) {
+                    @chmod($dir, 0775);
+                }
+            } else {
+                @chmod($path, 0664);
+            }
+        } catch (\Throwable $e) {
+            // Silence permission errors
+        }
     }
 }
