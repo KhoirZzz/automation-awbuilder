@@ -453,7 +453,7 @@ class DashboardController extends Controller
 
         $activeServiceKeys = ServiceTemplate::where('is_active', true)->pluck('key')->toArray();
         $durationKeys = collect(\App\Enums\ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
-        $activeSubdomains = Deployment::where('status', DeploymentStatus::ACTIVE)->pluck('client_slug')->toArray();
+        $activeSubdomains = Deployment::whereIn('status', [DeploymentStatus::ACTIVE, DeploymentStatus::PENDING_PAYMENT])->pluck('client_slug')->toArray();
 
         $defaultSystemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys, $activeSubdomains);
 
@@ -503,7 +503,7 @@ class DashboardController extends Controller
         // Always build the prompt dynamically based on the current database state
         $activeServiceKeys = ServiceTemplate::where('is_active', true)->pluck('key')->toArray();
         $durationKeys = collect(\App\Enums\ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
-        $activeSubdomains = Deployment::where('status', DeploymentStatus::ACTIVE)->pluck('client_slug')->toArray();
+        $activeSubdomains = Deployment::whereIn('status', [DeploymentStatus::ACTIVE, DeploymentStatus::PENDING_PAYMENT])->pluck('client_slug')->toArray();
         $systemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys, $activeSubdomains);
 
         // Inject the Master / Developer recognition prompt
@@ -610,11 +610,11 @@ class DashboardController extends Controller
         }
 
         $deployment = Deployment::where('client_slug', $clientSlug)
-            ->where('status', DeploymentStatus::ACTIVE)
+            ->whereIn('status', [DeploymentStatus::ACTIVE, DeploymentStatus::PENDING_PAYMENT])
             ->first();
 
         if (!$deployment) {
-            return "ERROR: Active deployment with slug '{$clientSlug}' not found.";
+            return "ERROR: Active or pending deployment with slug '{$clientSlug}' not found.";
         }
 
         $basePath = realpath($deployment->instance_path);

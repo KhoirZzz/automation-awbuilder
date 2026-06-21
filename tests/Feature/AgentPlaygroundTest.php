@@ -484,4 +484,77 @@ class AgentPlaygroundTest extends TestCase
         // Clean up
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/deployments'));
     }
+
+    public function test_agent_chat_with_read_file_tool_call_for_pending_payment_deployment(): void
+    {
+        $clientSlug = 'agoda-test-pending';
+        $instancePath = storage_path('app/deployments/' . $clientSlug);
+        if (!\Illuminate\Support\Facades\File::isDirectory($instancePath)) {
+            \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true);
+        }
+        $testFile = $instancePath . '/index.html';
+        \Illuminate\Support\Facades\File::put($testFile, '<h1>Welcome to Agoda Pending!</h1>');
+
+        $template = \App\Models\ServiceTemplate::create([
+            'key' => 'agoda',
+            'name' => 'Agoda App',
+            'category' => 'landing',
+            'template_path' => 'layanan/agoda',
+            'is_active' => true,
+        ]);
+
+        \App\Models\Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => '1234-pending',
+            'service_template_id' => $template->id,
+            'client_slug' => $clientSlug,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+            'status' => \App\Enums\DeploymentStatus::PENDING_PAYMENT,
+            'price' => 100000,
+        ]);
+
+        Http::fake([
+            'integrate.api.nvidia.com/*' => Http::sequence([
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => json_encode([
+                                    'status' => 'read_file',
+                                    'client_slug' => $clientSlug,
+                                    'file_path' => 'index.html',
+                                ])
+                            ]
+                        ]
+                    ]
+                ], 200),
+                Http::response([
+                    'choices' => [
+                        [
+                            'message' => [
+                                'content' => 'Saya sudah membaca file tersebut, isinya adalah Welcome to Agoda Pending!'
+                            ]
+                        ]
+                    ]
+                ], 200),
+            ])
+        ]);
+
+        $response = $this->postJson('/api/dashboard/agent/chat', [
+            'message' => 'Tolong baca isi file index.html di subdomain agoda-test-pending.',
+            'passkey' => '852963'
+        ], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'response' => 'Saya sudah membaca file tersebut, isinya adalah Welcome to Agoda Pending!'
+        ]);
+
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('app/deployments'));
+    }
 }
