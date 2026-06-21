@@ -78,16 +78,7 @@ function App() {
         }
     };
 
-    const renderView = () => {
-        switch (activeTab) {
-            case 'dashboard': return <Dashboard />;
-            case 'templates': return <Templates />;
-            case 'logs': return <Logs />;
-            case 'sandbox': return <Sandbox />;
-            case 'agent': return <Agent />;
-            default: return <Dashboard />;
-        }
-    };
+
 
     if (!isAuthenticated) {
         return <Login />;
@@ -335,7 +326,21 @@ function App() {
                     ? 'h-[calc(100dvh-136px)] lg:h-auto overflow-hidden lg:overflow-y-auto p-4 md:p-8 lg:px-12 lg:py-10 lg:pb-10'
                     : 'overflow-y-auto px-4 py-6 md:px-8 md:py-8 lg:px-12 lg:py-10 pb-24 lg:pb-10'
             }`}>
-                {renderView()}
+                <div className={activeTab === 'dashboard' ? '' : 'hidden'}>
+                    <Dashboard />
+                </div>
+                <div className={activeTab === 'templates' ? '' : 'hidden'}>
+                    <Templates />
+                </div>
+                <div className={activeTab === 'logs' ? '' : 'hidden'}>
+                    <Logs />
+                </div>
+                <div className={activeTab === 'sandbox' ? '' : 'hidden'}>
+                    <Sandbox />
+                </div>
+                <div className={activeTab === 'agent' ? 'h-full' : 'hidden'}>
+                    <Agent />
+                </div>
             </main>
         </div>
     );
