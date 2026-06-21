@@ -77,7 +77,10 @@ class DeployServiceAction
 
             // 2. Clone template (filesystem copy) or create empty directory
             if (File::exists($instancePath)) {
-                throw new Exception("Destination directory already exists: {$instancePath}");
+                Log::channel('deploy-audit')->info('Destination directory already exists. Overwriting/deleting existing directory.', [
+                    'instance_path' => $instancePath
+                ]);
+                File::deleteDirectory($instancePath);
             }
 
             if ($isBlank) {

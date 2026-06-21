@@ -120,6 +120,66 @@ class SandboxTest extends TestCase
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
     }
 
+    public function test_manual_deploy_overwrites_existing_directory(): void
+    {
+        // 1. Create a service template
+        $template = ServiceTemplate::create([
+            'key' => 'gojek',
+            'name' => 'Gojek Template',
+            'template_path' => 'gojek',
+            'is_active' => true,
+        ]);
+
+        // Mock base paths
+        config([
+            'deploy.template_base_path' => storage_path('templates'),
+            'deploy.instance_base_path' => storage_path('deployments_test'),
+        ]);
+
+        // Create the dummy template directory
+        \Illuminate\Support\Facades\File::makeDirectory(storage_path('templates/gojek'), 0755, true, true);
+        \Illuminate\Support\Facades\File::put(storage_path('templates/gojek/.env.example'), "CLIENT_SLUG=\nDEPLOY_EXPIRES_AT=\nDEPLOY_STARTED_AT=");
+
+        // Pre-create the instance deployment directory with collision files
+        $collidingPath = storage_path('deployments_test/mytestslug');
+        \Illuminate\Support\Facades\File::makeDirectory($collidingPath, 0755, true, true);
+        \Illuminate\Support\Facades\File::put($collidingPath . '/stale.txt', 'stale text');
+
+        $params = [
+            'service_key' => 'gojek',
+            'durasi' => '1_minggu',
+            'client_slug_request' => 'mytestslug',
+            'telegram_token' => '1234:ABC',
+            'telegram_chat_id' => '9876',
+            'price' => '120000'
+        ];
+        $leadRef = 'sandbox_manual_test_collision';
+
+        // Run the job handler directly
+        $job = new ProcessManualDeployJob($params, $leadRef);
+        $deployAction = $this->app->make(\App\Actions\DeployServiceAction::class);
+        $job->handle($deployAction);
+
+        // Assert Cache statuses are set
+        $this->assertEquals('completed', Cache::get("sandbox_status_{$leadRef}")['stage']);
+        $this->assertEquals('active', Cache::get("sandbox_status_{$leadRef}")['status']);
+
+        // Assert collision file no longer exists and new deployment files are set
+        $this->assertFileDoesNotExist($collidingPath . '/stale.txt');
+        $this->assertFileExists($collidingPath . '/.env');
+
+        // Assert deployment database entry exists
+        $this->assertDatabaseHas('deployments', [
+            'lead_reference' => $leadRef,
+            'client_slug' => 'mytestslug',
+            'status' => \App\Enums\DeploymentStatus::ACTIVE->value
+        ]);
+
+        // Clean up directories
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('templates/gojek'));
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+    }
+
     public function test_reserved_subdomains_behavior(): void
     {
         config(['app.url' => 'https://mockbuild.shop']);
