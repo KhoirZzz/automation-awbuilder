@@ -249,6 +249,30 @@ export default function Templates() {
         }
     };
 
+    const handleDeleteZip = async (filename) => {
+        if (!confirm(`Apakah Anda yakin ingin menghapus file ZIP "${filename}"?`)) {
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await fetch(`/api/dashboard/templates/zips/${filename}`, {
+                method: 'DELETE'
+            });
+            const data = await res.json();
+            if (data.success) {
+                await fetchZips();
+                showBanner('success', `File ZIP "${filename}" berhasil dihapus.`);
+            } else {
+                showBanner('error', data.error || 'Gagal menghapus file ZIP.');
+            }
+        } catch (err) {
+            showBanner('error', 'Koneksi API gagal.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const formatBytes = (bytes) => {
         if (bytes === 0) return '0 B';
         const k = 1024;
@@ -483,6 +507,16 @@ export default function Templates() {
                                                     <span className="relative z-10">
                                                         {holdingZip === zip.filename ? `Holding (${holdProgress}%)` : 'Hold to Extract'}
                                                     </span>
+                                                </button>
+
+                                                {/* Delete Button */}
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleDeleteZip(zip.filename)}
+                                                    className="inline-flex items-center justify-center font-semibold rounded-lg border border-zinc-800 text-zinc-400 hover:border-red-900 hover:text-red-500 hover:bg-red-950/10 active:scale-[0.98] transition-all text-xs h-9 px-3 w-full sm:w-auto"
+                                                    title="Hapus berkas ZIP"
+                                                >
+                                                    Delete
                                                 </button>
                                             </div>
                                         </div>

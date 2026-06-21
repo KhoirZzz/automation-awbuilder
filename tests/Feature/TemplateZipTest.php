@@ -216,4 +216,40 @@ class TemplateZipTest extends TestCase
             'id' => $template->id
         ]);
     }
+
+    public function test_delete_zip_success(): void
+    {
+        // 1. Create a dummy zip file in the upload directory
+        File::makeDirectory($this->uploadDir, 0755, true);
+        $zipPath = $this->uploadDir . '/delete-test.zip';
+        File::put($zipPath, 'dummy content');
+
+        $this->assertFileExists($zipPath);
+
+        // 2. Call the delete API
+        $response = $this->deleteJson('/api/dashboard/templates/zips/delete-test.zip', [], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'message' => 'File ZIP berhasil dihapus.'
+        ]);
+
+        // 3. Verify file is deleted
+        $this->assertFileDoesNotExist($zipPath);
+    }
+
+    public function test_delete_zip_not_found(): void
+    {
+        $response = $this->deleteJson('/api/dashboard/templates/zips/nonexistent-delete.zip', [], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(404);
+        $response->assertJson([
+            'error' => 'File ZIP tidak ditemukan.'
+        ]);
+    }
 }

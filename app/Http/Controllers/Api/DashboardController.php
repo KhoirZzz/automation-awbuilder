@@ -798,6 +798,31 @@ class DashboardController extends Controller
     }
 
     /**
+     * Delete an uploaded ZIP file.
+     */
+    public function destroyZip($filename): JsonResponse
+    {
+        $filename = basename($filename); // Prevent path traversal
+        $filePath = storage_path('app/uploads/' . $filename);
+
+        if (!File::exists($filePath)) {
+            return response()->json(['error' => 'File ZIP tidak ditemukan.'], 404);
+        }
+
+        try {
+            File::delete($filePath);
+            return response()->json([
+                'success' => true,
+                'message' => 'File ZIP berhasil dihapus.'
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Gagal menghapus file ZIP: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Extract uploaded ZIP file and register template.
      */
     public function extractZip(Request $request): JsonResponse

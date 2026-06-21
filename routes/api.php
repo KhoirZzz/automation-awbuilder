@@ -44,5 +44,6 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::post('/templates/upload-zip', [DashboardController::class, 'uploadZip']);
     Route::post('/templates/extract-zip', [DashboardController::class, 'extractZip']);
     Route::get('/templates/zips', [DashboardController::class, 'listZips']);
+    Route::delete('/templates/zips/{filename}', [DashboardController::class, 'destroyZip']);
 });
 
