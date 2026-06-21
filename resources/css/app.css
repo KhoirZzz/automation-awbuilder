@@ -397,3 +397,18 @@
     --accent-success: #42be65;
     --accent-error: #ff8383;
 }
+
+[data-theme="poimandres"] {
+    --bg-main: #1b1e28;
+    --bg-card: #25293a;
+    --bg-input: #2c334a;
+    --border-color: #506477;
+    --border-light: #5de4c7;
+    --text-primary: #a6accd;
+    --text-secondary: #c8d1e3;
+    --text-muted: #767c9d;
+    --text-muted-alt: #5c6370;
+    --accent-primary: #5de4c7;     /* mint */
+    --accent-success: #addb67;
+    --accent-error: #ff5c8a;
+}

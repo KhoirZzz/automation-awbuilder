@@ -140,6 +140,16 @@ function App() {
                         <option value="everforest">Everforest</option>
                         <option value="solarized-dark">Sol Dark</option>
                         <option value="solarized-light">Sol Light</option>
+                        <option value="kanagawa">Kanagawa</option>
+                        <option value="ayu-mirage">Ayu Mirage</option>
+                        <option value="night-owl">Night Owl</option>
+                        <option value="palenight">Palenight</option>
+                        <option value="github-dark">GitHub D</option>
+                        <option value="monokai-pro">Monokai P</option>
+                        <option value="vesper">Vesper</option>
+                        <option value="horizon">Horizon</option>
+                        <option value="oxocarbon">Oxocarbon</option>
+                        <option value="poimandres">Poimandres</option>
                     </select>
                     <div className="flex items-center gap-1.5">
                         <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
@@ -271,6 +281,16 @@ function App() {
                             <option value="everforest">Everforest Organic</option>
                             <option value="solarized-dark">Solarized Dark</option>
                             <option value="solarized-light">Solarized Light</option>
+                            <option value="kanagawa">Kanagawa Wave</option>
+                            <option value="ayu-mirage">Ayu Mirage Dark</option>
+                            <option value="night-owl">Night Owl Deep</option>
+                            <option value="palenight">Palenight Cozy</option>
+                            <option value="github-dark">GitHub Dark Mode</option>
+                            <option value="monokai-pro">Monokai Pro Dark</option>
+                            <option value="vesper">Vesper Minimal</option>
+                            <option value="horizon">Horizon Eclipse</option>
+                            <option value="oxocarbon">Oxocarbon Carbon</option>
+                            <option value="poimandres">Poimandres Mint</option>
                         </select>
                     </div>
 
