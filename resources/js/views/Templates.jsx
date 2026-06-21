@@ -12,6 +12,20 @@ export default function Templates() {
     const [modalOpen, setModalOpen] = useState(false);
     const [banner, setBanner] = useState(null); // { type: 'success'|'error'|'warning', text }
 
+    // File Manager / Editor States
+    const [fmOpen, setFmOpen] = useState(false);
+    const [fmTemplate, setFmTemplate] = useState(null);
+    const [fmPath, setFmPath] = useState('');
+    const [fmFiles, setFmFiles] = useState([]);
+    const [fmSelectedFile, setFmSelectedFile] = useState(null); // { name, path }
+    const [fmContent, setFmContent] = useState('');
+    const [fmLoadingFiles, setFmLoadingFiles] = useState(false);
+    const [fmLoadingContent, setFmLoadingContent] = useState(false);
+    const [fmSaving, setFmSaving] = useState(false);
+    const [fmNewInputOpen, setFmNewInputOpen] = useState(false);
+    const [fmNewName, setFmNewName] = useState('');
+    const [fmNewType, setFmNewType] = useState('file'); // 'file' | 'folder'
+
     const showBanner = (type, text) => {
         setBanner({ type, text });
     };
@@ -66,6 +80,150 @@ export default function Templates() {
     useEffect(() => {
         loadAllData();
     }, []);
+
+    // File Manager / Editor Actions
+    const openFileManager = (template) => {
+        setFmTemplate(template);
+        setFmPath('');
+        setFmFiles([]);
+        setFmSelectedFile(null);
+        setFmContent('');
+        setFmOpen(true);
+        loadFmFiles(template.key, '');
+    };
+
+    const loadFmFiles = async (templateKey, path) => {
+        setFmLoadingFiles(true);
+        try {
+            const res = await fetch(`/api/dashboard/templates/files?template_key=${templateKey}&path=${encodeURIComponent(path)}`);
+            const data = await res.json();
+            if (res.status === 200) {
+                setFmFiles(data);
+                setFmPath(path);
+            } else {
+                showBanner('error', data.error || 'Gagal memuat daftar file.');
+            }
+        } catch (e) {
+            showBanner('error', 'Gagal memuat file template.');
+        } finally {
+            setFmLoadingFiles(false);
+        }
+    };
+
+    const selectFileForEditing = async (file) => {
+        setFmSelectedFile(file);
+        setFmLoadingContent(true);
+        try {
+            const res = await fetch(`/api/dashboard/templates/file/content?template_key=${fmTemplate.key}&path=${encodeURIComponent(file.path)}`);
+            const data = await res.json();
+            if (res.status === 200) {
+                setFmContent(data.content);
+            } else {
+                showBanner('error', data.error || 'Gagal membaca isi file.');
+                setFmSelectedFile(null);
+            }
+        } catch (e) {
+            showBanner('error', 'Gagal memuat isi file.');
+            setFmSelectedFile(null);
+        } finally {
+            setFmLoadingContent(false);
+        }
+    };
+
+    const saveFmFile = async () => {
+        if (!fmSelectedFile) return;
+        setFmSaving(true);
+        try {
+            const res = await fetch('/api/dashboard/templates/file', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template_key: fmTemplate.key,
+                    path: fmSelectedFile.path,
+                    content: fmContent
+                })
+            });
+            const data = await res.json();
+            if (res.status === 200 && data.success) {
+                showBanner('success', `File "${fmSelectedFile.name}" berhasil disimpan.`);
+            } else {
+                showBanner('error', data.error || 'Gagal menyimpan file.');
+            }
+        } catch (e) {
+            showBanner('error', 'Gagal menyimpan file. Hubungi administrator.');
+        } finally {
+            setFmSaving(false);
+        }
+    };
+
+    const createFmItem = async () => {
+        if (!fmNewName.trim()) return;
+        const targetPath = fmPath ? `${fmPath}/${fmNewName.trim()}` : fmNewName.trim();
+        const isDir = fmNewType === 'folder';
+
+        try {
+            const res = await fetch('/api/dashboard/templates/file', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template_key: fmTemplate.key,
+                    path: targetPath,
+                    is_dir: isDir,
+                    content: isDir ? null : ''
+                })
+            });
+            const data = await res.json();
+            if (res.status === 200 && data.success) {
+                showBanner('success', `${isDir ? 'Folder' : 'File'} berhasil dibuat.`);
+                setFmNewInputOpen(false);
+                setFmNewName('');
+                loadFmFiles(fmTemplate.key, fmPath);
+            } else {
+                showBanner('error', data.error || 'Gagal membuat file/folder.');
+            }
+        } catch (e) {
+            showBanner('error', 'Gagal menghubungi server.');
+        }
+    };
+
+    const deleteFmItem = async (item, e) => {
+        e.stopPropagation();
+        if (!confirm(`Apakah Anda yakin ingin menghapus "${item.name}"?`)) {
+            return;
+        }
+
+        try {
+            const res = await fetch('/api/dashboard/templates/file', {
+                method: 'DELETE',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    template_key: fmTemplate.key,
+                    path: item.path
+                })
+            });
+            const data = await res.json();
+            if (res.status === 200 && data.success) {
+                showBanner('success', `Berhasil menghapus "${item.name}".`);
+                if (fmSelectedFile && fmSelectedFile.path === item.path) {
+                    setFmSelectedFile(null);
+                    setFmContent('');
+                }
+                loadFmFiles(fmTemplate.key, fmPath);
+            } else {
+                showBanner('error', data.error || 'Gagal menghapus file/folder.');
+            }
+        } catch (e) {
+            showBanner('error', 'Gagal menghubungi server.');
+        }
+    };
+
+    const navigateUp = () => {
+        if (!fmPath) return;
+        const parts = fmPath.split('/');
+        parts.pop();
+        const parentPath = parts.join('/');
+        loadFmFiles(fmTemplate.key, parentPath);
+    };
 
     const handleToggle = async (id) => {
         try {
@@ -376,14 +534,22 @@ export default function Templates() {
                                                      {tpl.is_active ? 'Deactivate' : 'Activate'}
                                                  </Button>
                                              </div>
-                                             <div className="flex items-center justify-end">
+                                             <div className="flex items-center justify-between gap-2.5">
                                                  <Button 
                                                      size="sm" 
                                                      variant="secondary"
-                                                     className="hover:bg-zinc-800 hover:text-white border-zinc-800 text-zinc-400 font-semibold font-mono"
+                                                     className="hover:bg-zinc-850 hover:text-white border-zinc-850 text-zinc-300 font-semibold font-mono flex-1 text-center"
+                                                     onClick={() => openFileManager(tpl)}
+                                                 >
+                                                     Edit Files
+                                                 </Button>
+                                                 <Button 
+                                                     size="sm" 
+                                                     variant="secondary"
+                                                     className="hover:bg-zinc-800 hover:text-white border-zinc-800 text-zinc-450 font-semibold font-mono"
                                                      onClick={() => handleDelete(tpl.id, tpl.name)}
                                                  >
-                                                     Delete Blueprint
+                                                     Delete
                                                  </Button>
                                              </div>
                                          </div>
@@ -611,6 +777,210 @@ export default function Templates() {
                         </label>
                     </div>
                 </form>
+            </Modal>
+
+            {/* File Manager / Editor Modal */}
+            <Modal
+                isOpen={fmOpen}
+                onClose={() => setFmOpen(false)}
+                title={fmTemplate ? `File Manager: ${fmTemplate.name}` : 'File Manager'}
+                className="w-11/12 max-w-5xl"
+                footer={
+                    <Button variant="secondary" onClick={() => setFmOpen(false)}>Close</Button>
+                }
+            >
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6 font-mono text-xs">
+                    {/* Left Pane: Files & Directories */}
+                    <div className="md:col-span-4 border border-zinc-800 rounded bg-zinc-950 p-4 space-y-4 flex flex-col h-[400px]">
+                        <div className="flex items-center justify-between border-b border-zinc-900 pb-2">
+                            <span className="font-bold text-zinc-400 uppercase tracking-wider text-[10px]">Files & Folders</span>
+                            {fmNewInputOpen ? (
+                                <button 
+                                    onClick={() => setFmNewInputOpen(false)}
+                                    className="text-red-500 hover:text-red-400 font-bold"
+                                >
+                                    Cancel
+                                </button>
+                            ) : (
+                                <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => { setFmNewType('file'); setFmNewInputOpen(true); }}
+                                        className="text-zinc-400 hover:text-white font-bold"
+                                        title="Create File"
+                                    >
+                                        +File
+                                    </button>
+                                    <button 
+                                        onClick={() => { setFmNewType('folder'); setFmNewInputOpen(true); }}
+                                        className="text-zinc-400 hover:text-white font-bold"
+                                        title="Create Folder"
+                                    >
+                                        +Folder
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Create new item form */}
+                        {fmNewInputOpen && (
+                            <div className="p-2 border border-zinc-800 bg-zinc-900/50 rounded space-y-2">
+                                <span className="text-zinc-500 text-[9px] uppercase font-semibold">New {fmNewType}</span>
+                                <div className="flex gap-2">
+                                    <input 
+                                        type="text"
+                                        value={fmNewName}
+                                        onChange={(e) => setFmNewName(e.target.value)}
+                                        placeholder={`Name e.g. ${fmNewType === 'file' ? 'test.html' : 'images'}`}
+                                        className="flex-1 bg-zinc-950 border border-zinc-800 rounded px-2 py-1 text-white focus:outline-none focus:border-zinc-500 font-mono text-[10px]"
+                                    />
+                                    <button 
+                                        onClick={createFmItem}
+                                        className="bg-white text-black px-2 py-1 rounded font-bold hover:bg-zinc-200"
+                                    >
+                                        Create
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Navigation / Breadcrumb */}
+                        <div className="flex items-center gap-1.5 flex-wrap bg-zinc-900/40 p-2 border border-zinc-900 rounded font-semibold text-[10px] text-zinc-400">
+                            <span 
+                                onClick={() => loadFmFiles(fmTemplate.key, '')}
+                                className="hover:text-white cursor-pointer"
+                            >
+                                ROOT
+                            </span>
+                            {fmPath && fmPath.split('/').map((part, index, arr) => {
+                                const currentClickPath = arr.slice(0, index + 1).join('/');
+                                return (
+                                    <React.Fragment key={index}>
+                                        <span>/</span>
+                                        <span 
+                                            onClick={() => loadFmFiles(fmTemplate.key, currentClickPath)}
+                                            className="hover:text-white cursor-pointer truncate max-w-[60px]"
+                                            title={part}
+                                        >
+                                            {part}
+                                        </span>
+                                    </React.Fragment>
+                                );
+                            })}
+                        </div>
+
+                        {/* Directory List Container */}
+                        <div className="flex-1 overflow-y-auto space-y-1.5 scrollbar-none pr-1">
+                            {fmLoadingFiles ? (
+                                <div className="text-center text-zinc-650 py-8 uppercase tracking-widest text-[9px] animate-pulse">
+                                    Loading blueprint files...
+                                </div>
+                            ) : (
+                                <>
+                                    {fmPath && (
+                                        <div 
+                                            onClick={navigateUp}
+                                            className="flex items-center gap-2 p-2 rounded border border-transparent hover:bg-zinc-900/60 cursor-pointer font-bold text-zinc-550 select-none text-[11px]"
+                                        >
+                                            📁 ..
+                                        </div>
+                                    )}
+                                    
+                                    {fmFiles.length === 0 ? (
+                                        <div className="text-center text-zinc-700 py-8 uppercase text-[9px]">
+                                            Empty folder.
+                                        </div>
+                                    ) : (
+                                        fmFiles.map((file) => {
+                                            const isSelected = fmSelectedFile && fmSelectedFile.path === file.path;
+                                            return (
+                                                <div 
+                                                    key={file.path}
+                                                    onClick={() => file.is_dir ? loadFmFiles(fmTemplate.key, file.path) : selectFileForEditing(file)}
+                                                    className={`group flex items-center justify-between p-2 rounded border transition-colors cursor-pointer select-none text-[11px] ${
+                                                        isSelected 
+                                                            ? 'bg-zinc-900 border-zinc-700 text-white font-semibold' 
+                                                            : 'bg-zinc-950/20 border-transparent hover:bg-zinc-900/40 text-zinc-450 hover:text-zinc-200'
+                                                    }`}
+                                                >
+                                                    <span className="truncate flex items-center gap-2">
+                                                        <span>{file.is_dir ? '📁' : '📄'}</span>
+                                                        <span className="truncate">{file.name}</span>
+                                                    </span>
+                                                    
+                                                    <div className="flex items-center gap-2">
+                                                        {!file.is_dir && (
+                                                            <span className="text-[9px] text-zinc-600 font-mono hidden md:inline">
+                                                                {(file.size / 1024).toFixed(1)} KB
+                                                            </span>
+                                                        )}
+                                                        <button 
+                                                            onClick={(e) => deleteFmItem(file, e)}
+                                                            className="text-zinc-650 hover:text-red-500 font-semibold text-[10px] md:opacity-0 group-hover:opacity-100 transition-opacity p-0.5"
+                                                            title={`Delete ${file.name}`}
+                                                        >
+                                                            ✕
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right Pane: Code Editor */}
+                    <div className="md:col-span-8 border border-zinc-800 rounded bg-zinc-950 p-4 flex flex-col h-[400px] space-y-3">
+                        {fmSelectedFile ? (
+                            <>
+                                <div className="flex items-center justify-between border-b border-zinc-900 pb-2.5">
+                                    <div className="flex flex-col">
+                                        <span className="font-bold text-zinc-200 text-[11px] truncate max-w-[280px]">
+                                            {fmSelectedFile.name}
+                                        </span>
+                                        <span className="text-[9px] text-zinc-600 font-mono">
+                                            {fmSelectedFile.path}
+                                        </span>
+                                    </div>
+                                    <Button 
+                                        size="sm" 
+                                        variant="primary" 
+                                        loading={fmSaving}
+                                        onClick={saveFmFile}
+                                        className="uppercase font-semibold tracking-wider font-mono text-[9px]"
+                                    >
+                                        Save Changes
+                                    </Button>
+                                </div>
+
+                                <div className="flex-1 relative border border-zinc-900 bg-zinc-950 rounded overflow-hidden">
+                                    {fmLoadingContent ? (
+                                        <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-zinc-550 uppercase tracking-widest text-[9px] font-bold font-mono animate-pulse">
+                                            Reading file stream...
+                                        </div>
+                                    ) : (
+                                        <textarea
+                                            value={fmContent}
+                                            onChange={(e) => setFmContent(e.target.value)}
+                                            className="w-full h-full bg-zinc-950 text-zinc-300 p-4 font-mono text-xs leading-relaxed focus:outline-none focus:ring-0 resize-none border-0 select-text"
+                                            placeholder="Write content here..."
+                                            spellCheck="false"
+                                        />
+                                    )}
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-8 text-zinc-700 border border-dashed border-zinc-900 rounded select-none">
+                                <span className="text-[20px] mb-2">📄</span>
+                                <span className="text-[9px] uppercase tracking-wider font-bold">No file selected</span>
+                                <p className="text-[10px] text-zinc-650 mt-1 max-w-xs leading-normal">
+                                    Select a text file from the sidebar list to modify its contents in real-time.
+                                </p>
+                            </div>
+                        )}
+                    </div>
+                </div>
             </Modal>
         </div>
     );

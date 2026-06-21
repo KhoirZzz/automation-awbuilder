@@ -1110,4 +1110,229 @@ class DashboardController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Resolve and validate a template file/directory path securely.
+     */
+    private function resolveTemplatePath(string $key, ?string $relativePath = null): ?string
+    {
+        $template = ServiceTemplate::where('key', $key)->first();
+        if (!$template) {
+            return null;
+        }
+
+        $templateBasePath = config('deploy.template_base_path');
+        $basePath = realpath($templateBasePath . '/' . $template->template_path);
+        if (!$basePath || !File::isDirectory($basePath)) {
+            return null;
+        }
+
+        if (empty($relativePath)) {
+            return $basePath;
+        }
+
+        // Security check: block path traversal (.. or starting with /)
+        if (str_contains($relativePath, '..') || str_starts_with($relativePath, '/')) {
+            return null;
+        }
+
+        $targetPath = $basePath . '/' . $relativePath;
+        $realTargetPath = realpath($targetPath);
+
+        if ($realTargetPath) {
+            if (!str_starts_with($realTargetPath, $basePath)) {
+                return null;
+            }
+            return $realTargetPath;
+        }
+
+        // If creating a new file/folder, check if parent is inside template root
+        $parentDir = realpath(dirname($targetPath));
+        if ($parentDir && str_starts_with($parentDir, $basePath)) {
+            return $targetPath;
+        }
+
+        return null;
+    }
+
+    /**
+     * List files and folders inside a template.
+     */
+    public function listFiles(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'template_key' => 'required|string',
+            'path' => 'nullable|string'
+        ]);
+
+        $basePath = $this->resolveTemplatePath($validated['template_key']);
+        if (!$basePath) {
+            return response()->json(['error' => 'Template not found or base directory does not exist.'], 404);
+        }
+
+        $relativePath = $validated['path'] ?? '';
+        $targetPath = $this->resolveTemplatePath($validated['template_key'], $relativePath);
+        if (!$targetPath || !File::isDirectory($targetPath)) {
+            return response()->json(['error' => 'Directory not found or invalid.'], 404);
+        }
+
+        $files = File::files($targetPath);
+        $directories = File::directories($targetPath);
+        
+        $result = [];
+
+        foreach ($directories as $dir) {
+            $name = basename($dir);
+            $rel = ltrim($relativePath . '/' . $name, '/');
+            $result[] = [
+                'name' => $name,
+                'path' => $rel,
+                'is_dir' => true,
+                'size' => 0
+            ];
+        }
+
+        foreach ($files as $file) {
+            $name = $file->getFilename();
+            $rel = ltrim($relativePath . '/' . $name, '/');
+            $result[] = [
+                'name' => $name,
+                'path' => $rel,
+                'is_dir' => false,
+                'size' => $file->getSize()
+            ];
+        }
+
+        return response()->json($result);
+    }
+
+    /**
+     * Get content of a text file inside a template.
+     */
+    public function getFileContent(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'template_key' => 'required|string',
+            'path' => 'required|string'
+        ]);
+
+        $targetPath = $this->resolveTemplatePath($validated['template_key'], $validated['path']);
+        if (!$targetPath || !File::exists($targetPath) || File::isDirectory($targetPath)) {
+            return response()->json(['error' => 'File not found or invalid.'], 404);
+        }
+
+        // Prevent opening huge files (Max 2MB)
+        if (File::size($targetPath) > 2 * 1024 * 1024) {
+            return response()->json(['error' => 'File too large to open (Max 2MB).'], 400);
+        }
+
+        $content = File::get($targetPath);
+        
+        // Block reading binary files
+        if (str_contains($content, "\0")) {
+            return response()->json(['error' => 'Binary files cannot be read/edited here.'], 400);
+        }
+
+        return response()->json([
+            'path' => $validated['path'],
+            'content' => $content
+        ]);
+    }
+
+    /**
+     * Create file or folder inside a template.
+     */
+    public function createFileOrFolder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'template_key' => 'required|string',
+            'path' => 'required|string',
+            'is_dir' => 'required|boolean',
+            'content' => 'nullable|string'
+        ]);
+
+        $targetPath = $this->resolveTemplatePath($validated['template_key'], $validated['path']);
+        if (!$targetPath) {
+            return response()->json(['error' => 'Invalid file path.'], 400);
+        }
+
+        if (File::exists($targetPath)) {
+            return response()->json(['error' => 'File or folder already exists.'], 400);
+        }
+
+        if ($validated['is_dir']) {
+            File::makeDirectory($targetPath, 0755, true);
+            $message = 'Folder created successfully.';
+        } else {
+            // Ensure parent directory exists
+            $parentDir = dirname($targetPath);
+            if (!File::isDirectory($parentDir)) {
+                File::makeDirectory($parentDir, 0755, true);
+            }
+            File::put($targetPath, $validated['content'] ?? '');
+            $message = 'File created successfully.';
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => $message
+        ]);
+    }
+
+    /**
+     * Save/update content of a text file inside a template.
+     */
+    public function updateFileContent(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'template_key' => 'required|string',
+            'path' => 'required|string',
+            'content' => 'present|string'
+        ]);
+
+        $targetPath = $this->resolveTemplatePath($validated['template_key'], $validated['path']);
+        if (!$targetPath || !File::exists($targetPath) || File::isDirectory($targetPath)) {
+            return response()->json(['error' => 'File not found or invalid.'], 404);
+        }
+
+        File::put($targetPath, $validated['content']);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'File saved successfully.'
+        ]);
+    }
+
+    /**
+     * Delete file or folder inside a template.
+     */
+    public function deleteFileOrFolder(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'template_key' => 'required|string',
+            'path' => 'required|string'
+        ]);
+
+        $targetPath = $this->resolveTemplatePath($validated['template_key'], $validated['path']);
+        if (!$targetPath || !File::exists($targetPath)) {
+            return response()->json(['error' => 'File or folder not found.'], 404);
+        }
+
+        // Security check: cannot delete the root of template path
+        $basePath = $this->resolveTemplatePath($validated['template_key']);
+        if ($targetPath === $basePath) {
+            return response()->json(['error' => 'Cannot delete template root directory.'], 400);
+        }
+
+        if (File::isDirectory($targetPath)) {
+            File::deleteDirectory($targetPath);
+        } else {
+            File::delete($targetPath);
+        }
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Deleted successfully.'
+        ]);
+    }
 }
