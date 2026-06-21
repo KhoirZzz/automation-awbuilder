@@ -20,9 +20,9 @@ class HermesService
      */
     public function analyzeLead(string $message, Collection $activeTemplates): array
     {
-        $apiUrl = env('HERMES_API_URL', 'http://localhost:11434/v1/chat/completions');
-        $apiKey = env('HERMES_API_KEY');
-        $model = env('HERMES_MODEL', 'hermes3');
+        $apiUrl = config('services.hermes.api_url');
+        $apiKey = config('services.hermes.api_key');
+        $model = config('services.hermes.model');
 
         $activeServiceKeys = $activeTemplates->pluck('key')->toArray();
         $durationKeys = collect(ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
@@ -242,9 +242,9 @@ PROMPT;
      */
     public function chat(string $systemPrompt, array|string $messages): string
     {
-        $apiUrl = env('HERMES_API_URL', 'http://localhost:11434/v1/chat/completions');
-        $apiKey = env('HERMES_API_KEY');
-        $model = env('HERMES_MODEL', 'hermes3');
+        $apiUrl = config('services.hermes.api_url');
+        $apiKey = config('services.hermes.api_key');
+        $model = config('services.hermes.model');
 
         $headers = [
             'Accept' => 'application/json',

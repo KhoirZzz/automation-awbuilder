@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'hermes' => [
+        'api_url' => env('HERMES_API_URL', 'http://localhost:11434/v1/chat/completions'),
+        'api_key' => env('HERMES_API_KEY'),
+        'model' => env('HERMES_MODEL', 'hermes3'),
+    ],
+
 ];
