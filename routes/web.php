@@ -87,10 +87,10 @@ Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
 
         return response(File::get($filePath), 200)
             ->header('Content-Type', $mime);
-    })->where('any', '.*');
+    })->where('any', '(?!api/).*');
 });
 
 // 3. Fallback route: Main domain, WWW, and localhost serves the public landing store page
 Route::get('/{any?}', function () {
     return view('landing');
-})->where('any', '.*');
+})->where('any', '(?!api/).*');
