@@ -100,4 +100,69 @@ class AgentPlaygroundTest extends TestCase
             'error' => 'Akses ditolak. Passkey tidak valid.'
         ]);
     }
+
+    public function test_persist_and_retrieve_agent_chat_history(): void
+    {
+        // 1. Post mock history
+        $response = $this->postJson('/api/dashboard/agent/persist-history', [
+            'chat_history' => [
+                [
+                    'role' => 'user',
+                    'content' => 'Hello AI!',
+                    'isError' => false,
+                    'isDeploying' => false,
+                    'url' => null,
+                ],
+                [
+                    'role' => 'assistant',
+                    'content' => 'Hi Developer!',
+                    'isError' => false,
+                    'isDeploying' => false,
+                    'url' => 'http://test.mockbuild.shop',
+                ]
+            ],
+            'passkey' => '852963'
+        ], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson(['success' => true]);
+
+        $this->assertDatabaseHas('agent_chats', [
+            'role' => 'user',
+            'content' => 'Hello AI!',
+        ]);
+
+        $this->assertDatabaseHas('agent_chats', [
+            'role' => 'assistant',
+            'content' => 'Hi Developer!',
+            'url' => 'http://test.mockbuild.shop',
+        ]);
+
+        // 2. Retrieve history through getAgentConfig
+        $responseGet = $this->getJson('/api/dashboard/agent/config', [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $responseGet->assertStatus(200);
+        $responseGet->assertJsonFragment([
+            'chat_history' => [
+                [
+                    'role' => 'user',
+                    'content' => 'Hello AI!',
+                    'isError' => false,
+                    'isDeploying' => false,
+                    'url' => null,
+                ],
+                [
+                    'role' => 'assistant',
+                    'content' => 'Hi Developer!',
+                    'isError' => false,
+                    'isDeploying' => false,
+                    'url' => 'http://test.mockbuild.shop',
+                ]
+            ]
+        ]);
+    }
 }

@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Deployment;
 use App\Models\ServiceTemplate;
+use App\Models\AgentChat;
 use App\Enums\DeploymentStatus;
 use App\Enums\ServiceDuration;
 use App\Jobs\ProcessLeadJob;
@@ -358,11 +359,25 @@ class DashboardController extends Controller
 
         $defaultSystemPrompt = $hermesService->buildAgentPlaygroundSystemPrompt($activeServiceKeys, $durationKeys);
 
+        $chatHistory = AgentChat::orderBy('id', 'asc')
+            ->get()
+            ->map(function ($chat) {
+                return [
+                    'role' => $chat->role,
+                    'content' => $chat->content,
+                    'isError' => $chat->is_error,
+                    'isDeploying' => $chat->is_deploying,
+                    'url' => $chat->url,
+                ];
+            })
+            ->toArray();
+
         return response()->json([
             'model' => $model,
             'api_url' => $apiUrl,
             'has_api_key' => !empty($apiKey),
             'default_system_prompt' => $defaultSystemPrompt,
+            'chat_history' => $chatHistory,
         ]);
     }
 
@@ -416,6 +431,44 @@ class DashboardController extends Controller
                 'error' => $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Persist the entire agent chat history to database.
+     */
+    public function persistAgentChat(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'chat_history' => 'required|array',
+            'passkey' => 'required|string',
+        ]);
+
+        $correctPasskey = config('deploy.agent_passkey', '852963');
+
+        if ($validated['passkey'] !== $correctPasskey) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Akses ditolak. Passkey tidak valid.'
+            ], 403);
+        }
+
+        // Wipe the old history
+        AgentChat::truncate();
+
+        // Insert new history items
+        foreach ($validated['chat_history'] as $item) {
+            AgentChat::create([
+                'role' => $item['role'],
+                'content' => $item['content'] ?? '',
+                'is_error' => !empty($item['isError']),
+                'is_deploying' => !empty($item['isDeploying']),
+                'url' => $item['url'] ?? null,
+            ]);
+        }
+
+        return response()->json([
+            'success' => true
+        ]);
     }
 
     /**

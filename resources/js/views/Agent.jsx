@@ -50,12 +50,38 @@ export default function Agent() {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [chatHistory]);
 
+    // Persist chat history to database whenever it changes or passkey changes
+    useEffect(() => {
+        if (config && passkey.length >= 6) {
+            persistChatHistory(chatHistory);
+        }
+    }, [chatHistory, passkey, config]);
+
+    const persistChatHistory = async (history) => {
+        if (passkey.length < 6) return;
+        try {
+            await fetch('/api/dashboard/agent/persist-history', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    chat_history: history,
+                    passkey: passkey
+                })
+            });
+        } catch (e) {
+            console.error('Failed to persist chat history', e);
+        }
+    };
+
     const fetchAgentConfig = async () => {
         try {
             const res = await fetch('/api/dashboard/agent/config');
             const data = await res.json();
             setConfig(data);
             setSystemPrompt(data.default_system_prompt || '');
+            if (data.chat_history && data.chat_history.length > 0) {
+                setChatHistory(data.chat_history);
+            }
         } catch (e) {
             console.error('Failed to fetch agent config', e);
         }

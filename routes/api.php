@@ -35,6 +35,7 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::get('/agent/config', [DashboardController::class, 'getAgentConfig']);
     Route::post('/agent/chat', [DashboardController::class, 'agentChat']);
     Route::post('/agent/deploy', [DashboardController::class, 'agentDeploy']);
+    Route::post('/agent/persist-history', [DashboardController::class, 'persistAgentChat']);
     Route::post('/templates/upload-zip', [DashboardController::class, 'uploadZip']);
     Route::post('/templates/extract-zip', [DashboardController::class, 'extractZip']);
     Route::get('/templates/zips', [DashboardController::class, 'listZips']);
