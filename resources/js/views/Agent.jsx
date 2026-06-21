@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
+import { Modal } from '../components/Modal';
 
 function tryParseDeployJson(text) {
     if (!text) return null;
@@ -31,6 +32,8 @@ export default function Agent() {
     const [systemPrompt, setSystemPrompt] = useState('');
     const [userMessage, setUserMessage] = useState('');
     const [passkey, setPasskey] = useState(localStorage.getItem('agent_passkey') || '');
+    const [lockModalOpen, setLockModalOpen] = useState(false);
+    const [tempPasskey, setTempPasskey] = useState('');
     const [chatHistory, setChatHistory] = useState([
         { role: 'assistant', content: 'Agent Workspace online. Send instructions or queries to test model behavior.' }
     ]);
@@ -192,19 +195,13 @@ export default function Agent() {
                         </div>
                     </div>
                     <div className="flex flex-col justify-center">
-                        <span className="text-zinc-500 block uppercase font-semibold text-[10px] mb-1">Passkey Akses (6 Digit)</span>
-                        <input
-                            type="password"
-                            maxLength="6"
-                            placeholder="------"
-                            value={passkey}
-                            onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, ''); // only digits
-                                setPasskey(val);
-                                localStorage.setItem('agent_passkey', val);
-                            }}
-                            className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-white placeholder-zinc-700 w-24 text-center font-bold tracking-widest text-xs focus:outline-none focus:border-zinc-500"
-                        />
+                        <span className="text-zinc-500 block uppercase font-semibold text-[10px] mb-1">Passkey Akses</span>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className={`h-1.5 w-1.5 rounded-full ${passkey.length >= 6 ? 'bg-white animate-pulse' : 'bg-red-500'}`}></span>
+                            <span className="text-zinc-350 font-bold uppercase tracking-wider text-[10px]">
+                                {passkey.length >= 6 ? 'Authenticated' : 'Locked'}
+                            </span>
+                        </div>
                     </div>
                 </div>
             )}
@@ -215,22 +212,42 @@ export default function Agent() {
                     <Card 
                         title="AI Worker Workspace"
                         action={
-                            <Button size="sm" variant="secondary" onClick={handleClearChat} disabled={passkey.length < 6}>
-                                Clear History
-                            </Button>
+                            <div className="flex gap-2">
+                                <Button size="sm" variant="secondary" onClick={() => {
+                                    setTempPasskey(passkey);
+                                    setLockModalOpen(true);
+                                }}>
+                                    Passkey
+                                </Button>
+                                <Button size="sm" variant="secondary" onClick={handleClearChat} disabled={passkey.length < 6}>
+                                    Clear History
+                                </Button>
+                            </div>
                         }
                         className="flex flex-col h-[600px]"
                     >
                         {/* Conversation Box */}
                         {passkey.length < 6 ? (
-                            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-900 rounded-lg p-8 text-center space-y-3 my-4">
+                            <div className="flex-1 flex flex-col items-center justify-center border border-dashed border-zinc-900 rounded-lg p-8 text-center space-y-4 my-4">
                                 <svg className="w-8 h-8 text-zinc-650 animate-bounce" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                                 </svg>
-                                <span className="text-zinc-500 uppercase font-bold tracking-wider text-[10px]">Akses Terkunci</span>
-                                <p className="text-zinc-600 max-w-xs leading-normal">
-                                    Masukkan 6-digit passkey pada panel status di atas untuk mengaktifkan obrolan dengan AI Worker.
-                                </p>
+                                <div className="space-y-1">
+                                    <span className="text-zinc-500 uppercase font-bold tracking-wider text-[10px]">Akses Terkunci</span>
+                                    <p className="text-zinc-600 max-w-xs leading-normal">
+                                        Masukkan 6-digit passkey untuk mengaktifkan obrolan dengan AI Worker.
+                                    </p>
+                                </div>
+                                <Button 
+                                    variant="primary" 
+                                    onClick={() => {
+                                        setTempPasskey('');
+                                        setLockModalOpen(true);
+                                    }}
+                                    className="uppercase font-semibold tracking-wider text-xs px-6 py-2.5"
+                                >
+                                    Unlock Workspace
+                                </Button>
                             </div>
                         ) : (
                             <div className="flex-1 overflow-y-auto pr-2 space-y-4 mb-4 h-[440px] min-h-[440px] max-h-[440px] scrollbar-thin scrollbar-thumb-zinc-800 scrollbar-track-transparent">
@@ -316,6 +333,50 @@ export default function Agent() {
                     </Card>
                 </div>
             </div>
+
+            {/* Passkey Input Modal */}
+            <Modal
+                isOpen={lockModalOpen}
+                onClose={() => setLockModalOpen(false)}
+                title="AI Worker Authentication"
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setLockModalOpen(false)}>
+                            Batal
+                        </Button>
+                        <Button 
+                            variant="primary" 
+                            disabled={tempPasskey.length < 6}
+                            onClick={() => {
+                                setPasskey(tempPasskey);
+                                localStorage.setItem('agent_passkey', tempPasskey);
+                                setLockModalOpen(false);
+                            }}
+                        >
+                            Simpan & Unlock
+                        </Button>
+                    </>
+                }
+            >
+                <div className="space-y-4 text-center font-mono text-xs">
+                    <p className="text-zinc-400 leading-normal uppercase text-[10px]">
+                        Masukkan 6-digit passkey khusus AI Worker Anda
+                    </p>
+                    <div className="max-w-xs mx-auto">
+                        <input
+                            type="password"
+                            maxLength="6"
+                            placeholder="------"
+                            value={tempPasskey}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, ''); // only digits
+                                setTempPasskey(val);
+                            }}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded p-3 text-white text-center font-bold tracking-[1.5em] text-lg placeholder-zinc-700 focus:outline-none focus:border-zinc-500"
+                        />
+                    </div>
+                </div>
+            </Modal>
         </div>
     );
 }
