@@ -136,4 +136,81 @@ class SandboxTest extends TestCase
         $responseMail = $this->get('http://mail.mockbuild.shop/');
         $responseMail->assertStatus(404);
     }
+
+    public function test_public_templates_endpoint_returns_active_templates(): void
+    {
+        // Create an active template
+        ServiceTemplate::create([
+            'key' => 'shopee-bot-active',
+            'name' => 'Shopee Bot Active',
+            'template_path' => 'shopee-bot',
+            'is_active' => true
+        ]);
+
+        // Create an inactive template
+        ServiceTemplate::create([
+            'key' => 'shopee-bot-inactive',
+            'name' => 'Shopee Bot Inactive',
+            'template_path' => 'shopee-bot',
+            'is_active' => false
+        ]);
+
+        $response = $this->getJson('/api/public/templates');
+
+        $response->assertStatus(200);
+        $response->assertJsonFragment([
+            'key' => 'shopee-bot-active',
+            'name' => 'Shopee Bot Active',
+        ]);
+        $response->assertJsonMissing([
+            'key' => 'shopee-bot-inactive',
+        ]);
+    }
+
+    public function test_public_deploy_endpoint_creates_pending_payment_deployment(): void
+    {
+        // 1. Create a service template
+        ServiceTemplate::create([
+            'key' => 'gojek',
+            'name' => 'Gojek Template',
+            'template_path' => 'gojek',
+            'is_active' => true,
+        ]);
+
+        // Mock base paths
+        config([
+            'deploy.template_base_path' => storage_path('templates'),
+            'deploy.instance_base_path' => storage_path('deployments_test'),
+            'deploy.agent_passkey' => '852963'
+        ]);
+
+        // Create the dummy template directory
+        \Illuminate\Support\Facades\File::makeDirectory(storage_path('templates/gojek'), 0755, true, true);
+        \Illuminate\Support\Facades\File::put(storage_path('templates/gojek/.env.example'), "CLIENT_SLUG=\nDEPLOY_EXPIRES_AT=\nDEPLOY_STARTED_AT=");
+
+        $response = $this->postJson('/api/public/deploy', [
+            'service_key' => 'gojek',
+            'durasi' => '1_bulan',
+            'client_slug_request' => 'pubslugtest',
+            'telegram_token' => '999:DEF',
+            'telegram_chat_id' => '111',
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'price' => 150000
+        ]);
+
+        // Assert deployment database entry exists as pending_payment
+        $this->assertDatabaseHas('deployments', [
+            'client_slug' => 'pubslugtest',
+            'status' => \App\Enums\DeploymentStatus::PENDING_PAYMENT->value,
+            'price' => 150000
+        ]);
+
+        // Clean up directories
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('templates/gojek'));
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+    }
 }

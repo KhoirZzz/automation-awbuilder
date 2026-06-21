@@ -1,18 +1,37 @@
 <?php
 
 use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Route;
 
-// Handle wildcard subdomains dynamically
+// Handle routing domain detection
 $routeDomain = parse_url(config('app.url'), PHP_URL_HOST);
 if (app()->runningUnitTests()) {
     $routeDomain = 'mockbuild.shop';
 }
+
+// 1. Admin & Dashboard panel subdomains
+Route::group(['domain' => 'admin.' . $routeDomain], function () {
+    Route::get('/{any?}', function () {
+        return view('welcome');
+    })->where('any', '.*');
+});
+
+Route::group(['domain' => 'dashboard.' . $routeDomain], function () {
+    Route::get('/{any?}', function () {
+        return view('welcome');
+    })->where('any', '.*');
+});
+
+// 2. Wildcard client subdomains dynamically proxied
 Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
     Route::get('/{any?}', function ($subdomain, $any = null) {
         $reserved = ['www', 'admin', 'api', 'mail', 'app', 'dev', 'status', 'portal', 'dashboard'];
         if (in_array(strtolower($subdomain), $reserved)) {
-            if (in_array(strtolower($subdomain), ['admin', 'dashboard', 'www'])) {
-                return view('welcome');
+            if (in_array(strtolower($subdomain), ['admin', 'dashboard'])) {
+                return view('welcome'); // Admin Panel SPA
+            }
+            if (strtolower($subdomain) === 'www') {
+                return view('landing'); // Public Store landing page
             }
             abort(404);
         }
@@ -71,6 +90,7 @@ Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
     })->where('any', '.*');
 });
 
+// 3. Fallback route: Main domain, WWW, and localhost serves the public landing store page
 Route::get('/{any?}', function () {
-    return view('welcome');
+    return view('landing');
 })->where('any', '.*');

@@ -946,4 +946,120 @@ class DashboardController extends Controller
             ], 500);
         }
     }
+
+    /**
+     * Get active templates for public landing page.
+     */
+    public function publicTemplates(): JsonResponse
+    {
+        $templates = ServiceTemplate::where('is_active', true)->get(['key', 'name', 'category']);
+        return response()->json($templates);
+    }
+
+    /**
+     * Handles public client checkout deployment request.
+     */
+    public function publicDeploy(Request $request, \App\Actions\DeployServiceAction $deployAction): JsonResponse
+    {
+        $validated = $request->validate([
+            'service_key' => 'required|string',
+            'durasi' => 'required|string',
+            'client_slug_request' => 'required|string',
+            'telegram_token' => 'required|string',
+            'telegram_chat_id' => 'required|string',
+        ]);
+
+        $serviceTemplate = ServiceTemplate::where('key', $validated['service_key'])->first();
+        if (!$serviceTemplate || !$serviceTemplate->is_active) {
+            return response()->json(['success' => false, 'error' => 'Template tidak ditemukan atau tidak aktif.'], 400);
+        }
+
+        // Validate slug compliance
+        $clientSlug = strtolower(trim($validated['client_slug_request']));
+        if (!preg_match('/^[a-z0-9](-?[a-z0-9])*$/', $clientSlug) || strlen($clientSlug) > 63 || strlen($clientSlug) < 2) {
+            return response()->json(['success' => false, 'error' => 'Subdomain tidak sesuai format DNS.'], 400);
+        }
+
+        // Check reserved words
+        $reserved = config('deploy.reserved_slugs', []);
+        if (in_array($clientSlug, $reserved)) {
+            return response()->json(['success' => false, 'error' => 'Subdomain merupakan kata terlarang.'], 400);
+        }
+
+        // Check duplicates
+        $duplicate = Deployment::where('client_slug', $clientSlug)
+            ->whereIn('status', [DeploymentStatus::PENDING, DeploymentStatus::ACTIVE])
+            ->first();
+        if ($duplicate) {
+            return response()->json(['success' => false, 'error' => 'Subdomain ini sudah aktif digunakan.'], 400);
+        }
+
+        // Map duration enum
+        $durationEnum = \App\Enums\ServiceDuration::tryFrom($validated['durasi']);
+        if (!$durationEnum) {
+            return response()->json(['success' => false, 'error' => 'Durasi tidak valid.'], 400);
+        }
+
+        // Calculate standard price based on duration
+        $price = match ($durationEnum) {
+            \App\Enums\ServiceDuration::ONE_WEEK => 50000,
+            \App\Enums\ServiceDuration::ONE_MONTH => 150000,
+            \App\Enums\ServiceDuration::THREE_MONTHS => 400000,
+            \App\Enums\ServiceDuration::SIX_MONTHS => 750000,
+            \App\Enums\ServiceDuration::ONE_YEAR => 1200000,
+        };
+
+        // Build DTO
+        $result = new \App\DataTransferObjects\LeadAnalysisResult(
+            serviceTemplateId: $serviceTemplate->id,
+            duration: $durationEnum,
+            clientSlug: $clientSlug,
+            expiresAt: $durationEnum->calculateExpiry(),
+            source: 'telegram', // Set to 'telegram' to make status PENDING_PAYMENT
+            leadReference: 'web_' . time() . '_' . rand(100, 999),
+            price: $price,
+            rawLlmResponse: json_encode([
+                'telegram_token' => $validated['telegram_token'],
+                'telegram_chat_id' => $validated['telegram_chat_id'],
+            ])
+        );
+
+        try {
+            // Execute deployment
+            $deployment = $deployAction->execute($result);
+
+            // Construct final URL
+            $host = $request->getHost();
+            $baseDomain = 'mockbuild.shop';
+            if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $host)) {
+                $baseDomain = $host;
+            }
+            $clientUrl = "http://{$clientSlug}.{$baseDomain}";
+
+            // Notify Admin via Telegram bot
+            $adminChatId = env('TELEGRAM_ADMIN_CHAT_ID');
+            if ($adminChatId) {
+                try {
+                    $botService = app(\App\Services\TelegramBotService::class);
+                    $formattedPrice = 'Rp ' . number_format($price, 0, ',', '.');
+                    $botService->sendMessage($adminChatId, "<b>🔔 PEMESANAN WEB BARU MENUNGGU PERSETUJUAN</b>\n\n• Source: <b>Web Checkout</b>\n• Subdomain: <b>{$clientSlug}</b>\n• Durasi Sewa: <b>{$durationEnum->value}</b>\n• Harga: <b>{$formattedPrice}</b>\n\nSilakan verifikasi bukti pembayaran QRIS dari client lalu approve di dashboard atau ketik:\n<code>/approve {$clientSlug}</code>");
+                } catch (\Exception $ex) {
+                    \Illuminate\Support\Facades\Log::error('Failed to send telegram admin notification: ' . $ex->getMessage());
+                }
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Pemesanan berhasil dikonfigurasi.',
+                'url' => $clientUrl,
+                'price' => $price,
+                'deployment' => $deployment
+            ]);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'error' => 'Deployment failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
