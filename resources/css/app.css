@@ -134,3 +134,131 @@
     --accent-success: #50fa7b;
     --accent-error: #ff5555;
 }
+
+/* 7. NORD (Arctic Ice Soft Blue/Gray) */
+[data-theme="nord"] {
+    --bg-main: #2e3440;
+    --bg-card: #242933;
+    --bg-input: #3b4252;
+    --border-color: #4c566a;
+    --border-light: #88c0d0;
+    --text-primary: #eceff4;
+    --text-secondary: #e5e9f0;
+    --text-muted: #d8dee9;
+    --text-muted-alt: #81a1c1;
+    --accent-primary: #88c0d0;
+    --accent-success: #a3be8c;
+    --accent-error: #bf616a;
+}
+
+/* 8. ONE DARK (Classic Atom Code Theme) */
+[data-theme="one-dark"] {
+    --bg-main: #1f232a;
+    --bg-card: #181a1f;
+    --bg-input: #282c34;
+    --border-color: #3e4451;
+    --border-light: #61afef;
+    --text-primary: #abb2bf;
+    --text-secondary: #dcdfe4;
+    --text-muted: #98c379;
+    --text-muted-alt: #5c6370;
+    --accent-primary: #61afef;
+    --accent-success: #98c379;
+    --accent-error: #e06c75;
+}
+
+/* 9. SYNTHWAVE '84 (Sunset Neon Purple/Magenta/Yellow Glow) */
+[data-theme="synthwave-84"] {
+    --bg-main: #2b213a;
+    --bg-card: #241b2f;
+    --bg-input: #1a1625;
+    --border-color: #f92aad;
+    --border-light: #3fe4ec;
+    --text-primary: #f0e6f6;
+    --text-secondary: #f92aad;
+    --text-muted: #ff7edb;
+    --text-muted-alt: #72f1b8;
+    --accent-primary: #fede5d;
+    --accent-success: #72f1b8;
+    --accent-error: #fe4450;
+}
+
+/* 10. ROSE PINE (Dusky Cozy Dark Pink/Iris/Pine) */
+[data-theme="rose-pine"] {
+    --bg-main: #191724;
+    --bg-card: #1f1d2e;
+    --bg-input: #26233a;
+    --border-color: #403d52;
+    --border-light: #ebbcba;
+    --text-primary: #e0def4;
+    --text-secondary: #9ccfd8;
+    --text-muted: #c4a7e7;
+    --text-muted-alt: #6e6a86;
+    --accent-primary: #ebbcba;
+    --accent-success: #9ccfd8;
+    --accent-error: #eb6f92;
+}
+
+/* 11. TOKYO NIGHT (Shinjuku Neon Street Night) */
+[data-theme="tokyo-night"] {
+    --bg-main: #1a1b26;
+    --bg-card: #16161e;
+    --bg-input: #20212d;
+    --border-color: #3b4261;
+    --border-light: #7aa2f7;
+    --text-primary: #a9b1d6;
+    --text-secondary: #9ab1e1;
+    --text-muted: #bb9af3;
+    --text-muted-alt: #565f89;
+    --accent-primary: #7aa2f7;
+    --accent-success: #9ece6a;
+    --accent-error: #f7768e;
+}
+
+/* 12. EVERFOREST (Organic Soothing Warm Green) */
+[data-theme="everforest"] {
+    --bg-main: #2b3339;
+    --bg-card: #232a2e;
+    --bg-input: #343f44;
+    --border-color: #3d484d;
+    --border-light: #a7c080;
+    --text-primary: #d3c6aa;
+    --text-secondary: #e67e80;
+    --text-muted: #dbbc7f;
+    --text-muted-alt: #859289;
+    --accent-primary: #a7c080;
+    --accent-success: #a7c080;
+    --accent-error: #e67e80;
+}
+
+/* 13. SOLARIZED DARK (Ocean Deep Blue/Teal) */
+[data-theme="solarized-dark"] {
+    --bg-main: #002b36;
+    --bg-card: #073642;
+    --bg-input: #001f27;
+    --border-color: #586e75;
+    --border-light: #268bd2;
+    --text-primary: #93a1a1;
+    --text-secondary: #839496;
+    --text-muted: #2aa198;
+    --text-muted-alt: #586e75;
+    --accent-primary: #268bd2;
+    --accent-success: #859900;
+    --accent-error: #dc322f;
+}
+
+/* 14. SOLARIZED LIGHT (Ocean Sand Soft Cream/Teal) */
+[data-theme="solarized-light"] {
+    --bg-main: #fdf6e3;
+    --bg-card: #eee8d5;
+    --bg-input: #f4efdb;
+    --border-color: #93a1a1;
+    --border-light: #268bd2;
+    --text-primary: #586e75;
+    --text-secondary: #657b83;
+    --text-muted: #2aa198;
+    --text-muted-alt: #93a1a1;
+    --accent-primary: #073642;
+    --accent-success: #859900;
+    --accent-error: #dc322f;
+}

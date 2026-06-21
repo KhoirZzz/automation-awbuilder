@@ -117,6 +117,14 @@ function App() {
                         <option value="gruvbox-light">Gruvbox L</option>
                         <option value="catppuccin">Catppuccin</option>
                         <option value="dracula">Dracula</option>
+                        <option value="nord">Nord</option>
+                        <option value="one-dark">One Dark</option>
+                        <option value="synthwave-84">Synthwave</option>
+                        <option value="rose-pine">Rose Pine</option>
+                        <option value="tokyo-night">Tokyo Night</option>
+                        <option value="everforest">Everforest</option>
+                        <option value="solarized-dark">Sol Dark</option>
+                        <option value="solarized-light">Sol Light</option>
                     </select>
                     <div className="flex items-center gap-1.5">
                         <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
@@ -238,6 +246,14 @@ function App() {
                             <option value="gruvbox-light">Gruvbox Light</option>
                             <option value="catppuccin">Catppuccin Pastel</option>
                             <option value="dracula">Dracula Dark</option>
+                            <option value="nord">Nord Arctic</option>
+                            <option value="one-dark">One Dark Classic</option>
+                            <option value="synthwave-84">Synthwave '84</option>
+                            <option value="rose-pine">Rosé Pine Cozy</option>
+                            <option value="tokyo-night">Tokyo Night Neon</option>
+                            <option value="everforest">Everforest Organic</option>
+                            <option value="solarized-dark">Solarized Dark</option>
+                            <option value="solarized-light">Solarized Light</option>
                         </select>
                     </div>
 
