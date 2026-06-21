@@ -6,6 +6,8 @@ import Logs from './views/Logs';
 import Sandbox from './views/Sandbox';
 import Agent from './views/Agent';
 import Login from './views/Login';
+import { Modal } from './components/Modal';
+import { Button } from './components/Button';
 
 // Fetch Interceptor for Admin Passkey authentication
 const originalFetch = window.fetch;
@@ -46,6 +48,19 @@ function App() {
 
     const [prefilledAgentMessage, setPrefilledAgentMessage] = useState('');
 
+    // Custom Confirm Modal states
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmTitle, setConfirmTitle] = useState('Konfirmasi');
+    const [confirmMessage, setConfirmMessage] = useState('');
+    const [onConfirm, setOnConfirm] = useState(null);
+
+    const showConfirm = (title, message, callback) => {
+        setConfirmTitle(title);
+        setConfirmMessage(message);
+        setOnConfirm(() => callback);
+        setConfirmOpen(true);
+    };
+
     const handleTriggerAgentEdit = (clientSlug) => {
         setPrefilledAgentMessage(`tolong edit file di dalam folder subdomain ${clientSlug}`);
         handleTabChange('agent');
@@ -79,10 +94,10 @@ function App() {
     };
 
     const handleLogoutAction = () => {
-        if (confirm('Lock admin gateway?')) {
+        showConfirm('Lock Gateway', 'Apakah Anda yakin ingin mengunci admin gateway dan keluar?', () => {
             localStorage.removeItem('admin_passkey');
             window.dispatchEvent(new Event('admin-logged-out'));
-        }
+        });
     };
 
 
@@ -352,6 +367,26 @@ function App() {
                     />
                 </div>
             </main>
+
+            {/* Custom Confirm Modal */}
+            <Modal
+                isOpen={confirmOpen}
+                onClose={() => setConfirmOpen(false)}
+                title={confirmTitle}
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Batal</Button>
+                        <Button variant="danger" onClick={() => {
+                            setConfirmOpen(false);
+                            if (onConfirm) onConfirm();
+                        }}>OK</Button>
+                    </>
+                }
+            >
+                <div className="py-2 text-zinc-300 font-mono text-xs">
+                    {confirmMessage}
+                </div>
+            </Modal>
         </div>
     );
 }

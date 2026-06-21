@@ -23,6 +23,24 @@ export default function Dashboard({ onTriggerAgentEdit }) {
     const [selectedDeployment, setSelectedDeployment] = useState(null);
     const [extendDuration, setExtendDuration] = useState('1_minggu');
 
+    // Custom Confirm Modal states
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmTitle, setConfirmTitle] = useState('Konfirmasi');
+    const [confirmMessage, setConfirmMessage] = useState('');
+    const [onConfirm, setOnConfirm] = useState(null);
+
+    // Custom Approve Payment Modal states
+    const [approveModalOpen, setApproveModalOpen] = useState(false);
+    const [approvePrice, setApprovePrice] = useState('');
+    const [approveDeploymentId, setApproveDeploymentId] = useState(null);
+
+    const showConfirm = (title, message, callback) => {
+        setConfirmTitle(title);
+        setConfirmMessage(message);
+        setOnConfirm(() => callback);
+        setConfirmOpen(true);
+    };
+
     // File Manager (Manual Edit Deployed Code) states
     const [fmOpen, setFmOpen] = useState(false);
     const [fmDeployment, setFmDeployment] = useState(null);
@@ -145,35 +163,33 @@ export default function Dashboard({ onTriggerAgentEdit }) {
         }
     };
 
-    const deleteFmItem = async (item, e) => {
+    const deleteFmItem = (item, e) => {
         e.stopPropagation();
-        if (!confirm(`Apakah Anda yakin ingin menghapus "${item.name}"?`)) {
-            return;
-        }
-
-        try {
-            const res = await fetch('/api/dashboard/deployments/file', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    client_slug: fmDeployment.client_slug,
-                    path: item.path
-                })
-            });
-            const data = await res.json();
-            if (res.status === 200 && data.success) {
-                showBanner('success', `Berhasil menghapus "${item.name}".`);
-                if (fmSelectedFile && fmSelectedFile.path === item.path) {
-                    setFmSelectedFile(null);
-                    setFmContent('');
+        showConfirm('Hapus File/Folder', `Apakah Anda yakin ingin menghapus "${item.name}"?`, async () => {
+            try {
+                const res = await fetch('/api/dashboard/deployments/file', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        client_slug: fmDeployment.client_slug,
+                        path: item.path
+                    })
+                });
+                const data = await res.json();
+                if (res.status === 200 && data.success) {
+                    showBanner('success', `Berhasil menghapus "${item.name}".`);
+                    if (fmSelectedFile && fmSelectedFile.path === item.path) {
+                        setFmSelectedFile(null);
+                        setFmContent('');
+                    }
+                    loadFmFiles(fmDeployment.client_slug, fmPath);
+                } else {
+                    showBanner('error', data.error || 'Gagal menghapus file/folder.');
                 }
-                loadFmFiles(fmDeployment.client_slug, fmPath);
-            } else {
-                showBanner('error', data.error || 'Gagal menghapus file/folder.');
+            } catch (e) {
+                showBanner('error', 'Gagal menghubungi server.');
             }
-        } catch (e) {
-            showBanner('error', 'Gagal menghubungi server.');
-        }
+        });
     };
 
     const startRenameFmItem = (item, e) => {
@@ -267,23 +283,24 @@ export default function Dashboard({ onTriggerAgentEdit }) {
         loadData();
     }, []);
 
-    const handleTeardown = async (id) => {
-        if (!confirm('Are you sure you want to teardown and archive this deployment?')) return;
-        setActionLoading(id);
-        try {
-            const res = await fetch(`/api/dashboard/deployments/${id}/teardown`, { method: 'POST' });
-            const data = await res.json();
-            if (data.error) {
-                showBanner('error', data.error);
-            } else {
-                showBanner('success', 'Deployment torn down and archived successfully.');
-                loadData();
+    const handleTeardown = (id) => {
+        showConfirm('Teardown & Archive', 'Are you sure you want to teardown and archive this deployment?', async () => {
+            setActionLoading(id);
+            try {
+                const res = await fetch(`/api/dashboard/deployments/${id}/teardown`, { method: 'POST' });
+                const data = await res.json();
+                if (data.error) {
+                    showBanner('error', data.error);
+                } else {
+                    showBanner('success', 'Deployment torn down and archived successfully.');
+                    loadData();
+                }
+            } catch (e) {
+                showBanner('error', 'Teardown connection error.');
+            } finally {
+                setActionLoading(null);
             }
-        } catch (e) {
-            showBanner('error', 'Teardown connection error.');
-        } finally {
-            setActionLoading(null);
-        }
+        });
     };
 
     const handleRetry = async (id) => {
@@ -304,38 +321,44 @@ export default function Dashboard({ onTriggerAgentEdit }) {
         }
     };
 
-    const handleDeleteDeployment = async (id) => {
-        if (!confirm('Apakah Anda yakin ingin menghapus riwayat deployment ini?')) return;
-        setActionLoading(id);
-        try {
-            const res = await fetch(`/api/dashboard/deployments/${id}`, { method: 'DELETE' });
-            const data = await res.json();
-            if (data.error) {
-                showBanner('error', data.error);
-            } else {
-                showBanner('success', 'Riwayat deployment berhasil dihapus.');
-                loadData();
+    const handleDeleteDeployment = (id) => {
+        showConfirm('Hapus Riwayat', 'Apakah Anda yakin ingin menghapus riwayat deployment ini?', async () => {
+            setActionLoading(id);
+            try {
+                const res = await fetch(`/api/dashboard/deployments/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.error) {
+                    showBanner('error', data.error);
+                } else {
+                    showBanner('success', 'Riwayat deployment berhasil dihapus.');
+                    loadData();
+                }
+            } catch (e) {
+                showBanner('error', 'Gagal menghubungi server.');
+            } finally {
+                setActionLoading(null);
             }
-        } catch (e) {
-            showBanner('error', 'Gagal menghubungi server.');
-        } finally {
-            setActionLoading(null);
-        }
+        });
     };
 
-    const handleApprovePayment = async (id) => {
+    const handleApprovePayment = (id) => {
         const deployment = deployments.find(d => d.id === id);
         const currentPrice = deployment ? (deployment.price || '') : '';
         
-        const priceInput = prompt('Konfirmasi nominal pembayaran (Rupiah) untuk diaktifkan:', currentPrice || '150000');
-        if (priceInput === null) return; // Cancelled
+        setApproveDeploymentId(id);
+        setApprovePrice(currentPrice || '150000');
+        setApproveModalOpen(true);
+    };
 
-        setActionLoading(id);
+    const handleApprovePaymentSubmit = async () => {
+        if (!approveDeploymentId) return;
+        setApproveModalOpen(false);
+        setActionLoading(approveDeploymentId);
         try {
-            const res = await fetch(`/api/dashboard/deployments/${id}/approve`, { 
+            const res = await fetch(`/api/dashboard/deployments/${approveDeploymentId}/approve`, { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ price: priceInput })
+                body: JSON.stringify({ price: approvePrice })
             });
             const data = await res.json();
             if (data.error) {
@@ -348,6 +371,7 @@ export default function Dashboard({ onTriggerAgentEdit }) {
             showBanner('error', 'Approval API connection failed.');
         } finally {
             setActionLoading(null);
+            setApproveDeploymentId(null);
         }
     };
 
@@ -843,6 +867,55 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                             <option value="6_bulan">+6 Months</option>
                             <option value="1_tahun">+1 Year</option>
                         </select>
+                    </div>
+                </div>
+            </Modal>
+
+            {/* Custom Confirm Modal */}
+            <Modal
+                isOpen={confirmOpen}
+                onClose={() => setConfirmOpen(false)}
+                title={confirmTitle}
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Batal</Button>
+                        <Button variant="danger" onClick={() => {
+                            setConfirmOpen(false);
+                            if (onConfirm) onConfirm();
+                        }}>OK</Button>
+                    </>
+                }
+            >
+                <div className="py-2 text-zinc-300 font-mono text-xs">
+                    {confirmMessage}
+                </div>
+            </Modal>
+
+            {/* Approve Payment Modal */}
+            <Modal
+                isOpen={approveModalOpen}
+                onClose={() => setApproveModalOpen(false)}
+                title="Approve Payment & Aktifkan"
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setApproveModalOpen(false)}>Batal</Button>
+                        <Button variant="success" onClick={handleApprovePaymentSubmit}>Setujui & Aktifkan</Button>
+                    </>
+                }
+            >
+                <div className="space-y-4 font-mono text-xs">
+                    <p className="text-zinc-400">
+                        Konfirmasi nominal pembayaran (Rupiah) untuk mengaktifkan instansi ini secara penuh.
+                    </p>
+                    <div className="space-y-1.5">
+                        <label className="block font-semibold text-zinc-400 uppercase">Nominal Pembayaran (IDR)</label>
+                        <input
+                            type="number"
+                            value={approvePrice}
+                            onChange={(e) => setApprovePrice(e.target.value)}
+                            placeholder="e.g. 150000"
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white focus:outline-none focus:border-zinc-500 font-mono"
+                        />
                     </div>
                 </div>
             </Modal>

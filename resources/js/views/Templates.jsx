@@ -29,6 +29,19 @@ export default function Templates() {
     const showBanner = (type, text) => {
         setBanner({ type, text });
     };
+
+    // Custom Confirm Modal states
+    const [confirmOpen, setConfirmOpen] = useState(false);
+    const [confirmTitle, setConfirmTitle] = useState('Konfirmasi');
+    const [confirmMessage, setConfirmMessage] = useState('');
+    const [onConfirm, setOnConfirm] = useState(null);
+
+    const showConfirm = (title, message, callback) => {
+        setConfirmTitle(title);
+        setConfirmMessage(message);
+        setOnConfirm(() => callback);
+        setConfirmOpen(true);
+    };
     
     // Manual template form states
     const [newKey, setNewKey] = useState('');
@@ -186,35 +199,33 @@ export default function Templates() {
         }
     };
 
-    const deleteFmItem = async (item, e) => {
+    const deleteFmItem = (item, e) => {
         e.stopPropagation();
-        if (!confirm(`Apakah Anda yakin ingin menghapus "${item.name}"?`)) {
-            return;
-        }
-
-        try {
-            const res = await fetch('/api/dashboard/templates/file', {
-                method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    template_key: fmTemplate.key,
-                    path: item.path
-                })
-            });
-            const data = await res.json();
-            if (res.status === 200 && data.success) {
-                showBanner('success', `Berhasil menghapus "${item.name}".`);
-                if (fmSelectedFile && fmSelectedFile.path === item.path) {
-                    setFmSelectedFile(null);
-                    setFmContent('');
+        showConfirm('Hapus File/Folder', `Apakah Anda yakin ingin menghapus "${item.name}"?`, async () => {
+            try {
+                const res = await fetch('/api/dashboard/templates/file', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        template_key: fmTemplate.key,
+                        path: item.path
+                    })
+                });
+                const data = await res.json();
+                if (res.status === 200 && data.success) {
+                    showBanner('success', `Berhasil menghapus "${item.name}".`);
+                    if (fmSelectedFile && fmSelectedFile.path === item.path) {
+                        setFmSelectedFile(null);
+                        setFmContent('');
+                    }
+                    loadFmFiles(fmTemplate.key, fmPath);
+                } else {
+                    showBanner('error', data.error || 'Gagal menghapus file/folder.');
                 }
-                loadFmFiles(fmTemplate.key, fmPath);
-            } else {
-                showBanner('error', data.error || 'Gagal menghapus file/folder.');
+            } catch (e) {
+                showBanner('error', 'Gagal menghubungi server.');
             }
-        } catch (e) {
-            showBanner('error', 'Gagal menghubungi server.');
-        }
+        });
     };
 
     const navigateUp = () => {
@@ -238,39 +249,50 @@ export default function Templates() {
         }
     };
 
-    const handleDelete = async (id, name) => {
-        if (!confirm(`Apakah Anda yakin ingin menghapus blueprint "${name}"? Tindakan ini juga akan menghapus folder template dari penyimpanan.`)) {
-            return;
-        }
-
-        try {
-            let res = await fetch(`/api/dashboard/templates/${id}`, {
-                method: 'DELETE'
-            });
-            let data = await res.json();
-            
-            if (res.status === 200 && data.success) {
-                fetchTemplates();
-                showBanner('success', `Blueprint "${name}" berhasil dihapus.`);
-            } else if (res.status === 400 && data.error && data.error.includes('riwayat/aktif')) {
-                if (confirm(`${data.error}\n\nApakah Anda yakin ingin memaksa (force) menghapus blueprint ini? Tindakan ini akan menghentikan (teardown) semua deployment aktif yang terikat dan menghapus seluruh data riwayat deployment terkait.`)) {
-                    res = await fetch(`/api/dashboard/templates/${id}?force=true`, {
+    const handleDelete = (id, name) => {
+        showConfirm(
+            'Hapus Blueprint',
+            `Apakah Anda yakin ingin menghapus blueprint "${name}"? Tindakan ini juga akan menghapus folder template dari penyimpanan.`,
+            async () => {
+                try {
+                    let res = await fetch(`/api/dashboard/templates/${id}`, {
                         method: 'DELETE'
                     });
-                    data = await res.json();
+                    let data = await res.json();
+                    
                     if (res.status === 200 && data.success) {
                         fetchTemplates();
-                        showBanner('success', `Blueprint "${name}" dan seluruh riwayat terkait berhasil dihapus.`);
+                        showBanner('success', `Blueprint "${name}" berhasil dihapus.`);
+                    } else if (res.status === 400 && data.error && data.error.includes('riwayat/aktif')) {
+                        // Show second confirm modal
+                        showConfirm(
+                            'Force Hapus Blueprint',
+                            `${data.error}\n\nApakah Anda yakin ingin memaksa (force) menghapus blueprint ini? Tindakan ini akan menghentikan (teardown) semua deployment aktif yang terikat dan menghapus seluruh data riwayat deployment terkait.`,
+                            async () => {
+                                try {
+                                    res = await fetch(`/api/dashboard/templates/${id}?force=true`, {
+                                        method: 'DELETE'
+                                    });
+                                    data = await res.json();
+                                    if (res.status === 200 && data.success) {
+                                        fetchTemplates();
+                                        showBanner('success', `Blueprint "${name}" dan seluruh riwayat terkait berhasil dihapus.`);
+                                    } else {
+                                        showBanner('error', data.error || 'Gagal memaksa menghapus template.');
+                                    }
+                                } catch (e) {
+                                    showBanner('error', 'Gagal menghapus template. Hubungi administrator.');
+                                }
+                            }
+                        );
                     } else {
-                        showBanner('error', data.error || 'Gagal memaksa menghapus template.');
+                        showBanner('error', data.error || 'Gagal menghapus template.');
                     }
+                } catch (e) {
+                    showBanner('error', 'Gagal menghapus template. Hubungi administrator.');
                 }
-            } else {
-                showBanner('error', data.error || 'Gagal menghapus template.');
             }
-        } catch (e) {
-            showBanner('error', 'Gagal menghapus template. Hubungi administrator.');
-        }
+        );
     };
 
     const handleSubmit = async (e) => {
@@ -421,28 +443,26 @@ export default function Templates() {
         }
     };
 
-    const handleDeleteZip = async (filename) => {
-        if (!confirm(`Apakah Anda yakin ingin menghapus file ZIP "${filename}"?`)) {
-            return;
-        }
-
-        setLoading(true);
-        try {
-            const res = await fetch(`/api/dashboard/templates/zips/${filename}`, {
-                method: 'DELETE'
-            });
-            const data = await res.json();
-            if (data.success) {
-                await fetchZips();
-                showBanner('success', `File ZIP "${filename}" berhasil dihapus.`);
-            } else {
-                showBanner('error', data.error || 'Gagal menghapus file ZIP.');
+    const handleDeleteZip = (filename) => {
+        showConfirm('Hapus File ZIP', `Apakah Anda yakin ingin menghapus file ZIP "${filename}"?`, async () => {
+            setLoading(true);
+            try {
+                const res = await fetch(`/api/dashboard/templates/zips/${filename}`, {
+                    method: 'DELETE'
+                });
+                const data = await res.json();
+                if (data.success) {
+                    await fetchZips();
+                    showBanner('success', `File ZIP "${filename}" berhasil dihapus.`);
+                } else {
+                    showBanner('error', data.error || 'Gagal menghapus file ZIP.');
+                }
+            } catch (err) {
+                showBanner('error', 'Koneksi API gagal.');
+            } finally {
+                setLoading(false);
             }
-        } catch (err) {
-            showBanner('error', 'Koneksi API gagal.');
-        } finally {
-            setLoading(false);
-        }
+        });
     };
 
     const formatBytes = (bytes) => {
@@ -981,6 +1001,26 @@ export default function Templates() {
                             </div>
                         )}
                     </div>
+                </div>
+            </Modal>
+
+            {/* Custom Confirm Modal */}
+            <Modal
+                isOpen={confirmOpen}
+                onClose={() => setConfirmOpen(false)}
+                title={confirmTitle}
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => setConfirmOpen(false)}>Batal</Button>
+                        <Button variant="danger" onClick={() => {
+                            setConfirmOpen(false);
+                            if (onConfirm) onConfirm();
+                        }}>OK</Button>
+                    </>
+                }
+            >
+                <div className="py-2 text-zinc-300 font-mono text-xs whitespace-pre-line">
+                    {confirmMessage}
                 </div>
             </Modal>
         </div>
