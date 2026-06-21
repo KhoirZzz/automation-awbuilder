@@ -40,6 +40,10 @@ function App() {
         return localStorage.getItem('active_tab') || 'dashboard';
     });
 
+    const [theme, setTheme] = useState(() => {
+        return localStorage.getItem('app_theme') || 'nihilist';
+    });
+
     useEffect(() => {
         const handleLogin = () => setIsAuthenticated(true);
         const handleLogout = () => setIsAuthenticated(false);
@@ -52,6 +56,15 @@ function App() {
             window.removeEventListener('admin-logged-out', handleLogout);
         };
     }, []);
+
+    useEffect(() => {
+        document.documentElement.setAttribute('data-theme', theme);
+    }, [theme]);
+
+    const handleThemeChange = (newTheme) => {
+        setTheme(newTheme);
+        localStorage.setItem('app_theme', newTheme);
+    };
 
     const handleTabChange = (tab) => {
         setActiveTab(tab);
@@ -93,6 +106,18 @@ function App() {
                     </div>
                 </div>
                 <div className="flex items-center gap-3">
+                    <select 
+                        value={theme} 
+                        onChange={(e) => handleThemeChange(e.target.value)}
+                        className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1 text-[9px] font-mono text-zinc-300 focus:outline-none focus:border-zinc-500 cursor-pointer"
+                    >
+                        <option value="nihilist">Nihilist</option>
+                        <option value="cyberpunk">Cyberpunk</option>
+                        <option value="gruvbox-dark">Gruvbox D</option>
+                        <option value="gruvbox-light">Gruvbox L</option>
+                        <option value="catppuccin">Catppuccin</option>
+                        <option value="dracula">Dracula</option>
+                    </select>
                     <div className="flex items-center gap-1.5">
                         <span className="h-1.5 w-1.5 bg-emerald-400 rounded-full animate-pulse"></span>
                         <span className="text-[9px] font-mono text-zinc-500 uppercase tracking-wider">Online</span>
@@ -199,12 +224,30 @@ function App() {
                     </button>
                 </nav>
 
-                <div className="mt-auto pt-6 border-t border-zinc-900 flex flex-col gap-1 font-mono">
-                    <span className="text-zinc-600 text-[9px] font-bold tracking-wider uppercase">Server Status</span>
-                    <span className="text-[11px] font-semibold text-zinc-400 flex items-center gap-2">
-                        <span className="h-1.5 w-1.5 bg-white rounded-full animate-pulse"></span>
-                        Active Audit Engine
-                    </span>
+                <div className="mt-auto pt-6 border-t border-zinc-900 flex flex-col gap-3.5 font-mono">
+                    <div className="flex flex-col gap-1.5">
+                        <span className="text-zinc-500 text-[9px] font-bold tracking-wider uppercase">Active Theme</span>
+                        <select 
+                            value={theme} 
+                            onChange={(e) => handleThemeChange(e.target.value)}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded px-2.5 py-1.5 text-[10px] font-mono text-zinc-350 focus:outline-none focus:border-zinc-500 cursor-pointer"
+                        >
+                            <option value="nihilist">Nihilist B&W</option>
+                            <option value="cyberpunk">Cyberpunk Neon</option>
+                            <option value="gruvbox-dark">Gruvbox Dark</option>
+                            <option value="gruvbox-light">Gruvbox Light</option>
+                            <option value="catppuccin">Catppuccin Pastel</option>
+                            <option value="dracula">Dracula Dark</option>
+                        </select>
+                    </div>
+
+                    <div className="flex flex-col gap-1">
+                        <span className="text-zinc-600 text-[9px] font-bold tracking-wider uppercase">Server Status</span>
+                        <span className="text-[11px] font-semibold text-zinc-400 flex items-center gap-2">
+                            <span className="h-1.5 w-1.5 bg-white rounded-full animate-pulse"></span>
+                            Active Audit Engine
+                        </span>
+                    </div>
                 </div>
             </aside>
 

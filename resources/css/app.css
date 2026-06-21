@@ -6,6 +6,131 @@
 @source '../js/**/*.js';
 
 @theme {
+    /* Map Tailwind's semantic colors to our dynamic CSS variables */
+    --color-black: var(--bg-main);
+    --color-zinc-950: var(--bg-card);
+    --color-zinc-900: var(--bg-input);
+    --color-zinc-855: var(--border-light);
+    --color-zinc-850: var(--border-light);
+    --color-zinc-800: var(--border-color);
+    --color-zinc-100: var(--text-primary);
+    --color-zinc-300: var(--text-secondary);
+    --color-zinc-350: var(--text-muted);
+    --color-zinc-400: var(--text-muted);
+    --color-zinc-450: var(--text-muted-alt);
+    --color-zinc-500: var(--text-muted-alt);
+    --color-zinc-550: var(--text-muted-alt);
+    --color-zinc-600: var(--text-muted-alt);
+    --color-zinc-650: var(--text-muted-alt);
+    --color-zinc-700: var(--text-muted-alt);
+    --color-white: var(--accent-primary);
+    
+    /* Map status indicator colors to theme accent success/error */
+    --color-emerald-400: var(--accent-success);
+    --color-emerald-500: var(--accent-success);
+    --color-red-500: var(--accent-error);
+    --color-red-400: var(--accent-error);
+
     --font-sans: 'Plus Jakarta Sans', 'Outfit', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
         'Segoe UI Symbol', 'Noto Color Emoji';
+}
+
+/* ==============================================================================
+   THEME VARIABLES CONFIGURATIONS
+   ============================================================================== */
+
+/* 1. NIHILIST B&W (Default Monochrome) */
+:root, [data-theme="nihilist"] {
+    --bg-main: #000000;
+    --bg-card: #09090b;
+    --bg-input: #18181b;
+    --border-color: #27272a;
+    --border-light: #3f3f46;
+    --text-primary: #f4f4f5;
+    --text-secondary: #d4d4d8;
+    --text-muted: #a1a1aa;
+    --text-muted-alt: #71717a;
+    --accent-primary: #ffffff;
+    --accent-success: #10b981;
+    --accent-error: #ef4444;
+}
+
+/* 2. CYBERPUNK (Neon & High Contrast Purple/Cyan/Yellow) */
+[data-theme="cyberpunk"] {
+    --bg-main: #0c0714;
+    --bg-card: #1a0f2e;
+    --bg-input: #251642;
+    --border-color: #00ffcc;
+    --border-light: #ff0055;
+    --text-primary: #ffff00;
+    --text-secondary: #00ffcc;
+    --text-muted: #ff0055;
+    --text-muted-alt: #8b5cf6;
+    --accent-primary: #ffff00;
+    --accent-success: #00ffcc;
+    --accent-error: #ff0055;
+}
+
+/* 3. GRUVBOX DARK (Retro Warm Dark, Earthy Green/Orange) */
+[data-theme="gruvbox-dark"] {
+    --bg-main: #1d2021;
+    --bg-card: #282828;
+    --bg-input: #32302f;
+    --border-color: #504945;
+    --border-light: #d65d0e;
+    --text-primary: #fbf1c7;
+    --text-secondary: #ebdbb2;
+    --text-muted: #bdae93;
+    --text-muted-alt: #a89984;
+    --accent-primary: #fe8019;
+    --accent-success: #b8bb26;
+    --accent-error: #fb4934;
+}
+
+/* 4. GRUVBOX LIGHT (Retro Cream Background & Brown/Orange Accents) */
+[data-theme="gruvbox-light"] {
+    --bg-main: #fbf1c7;
+    --bg-card: #f2e5bc;
+    --bg-input: #ebdbb2;
+    --border-color: #d5c4a1;
+    --border-light: #af3a03;
+    --text-primary: #282828;
+    --text-secondary: #3c3836;
+    --text-muted: #504945;
+    --text-muted-alt: #665c54;
+    --accent-primary: #282828;
+    --accent-success: #79740e;
+    --accent-error: #9d0006;
+}
+
+/* 5. CATPPUCCIN (Soft Pastel Lavender Dark) */
+[data-theme="catppuccin"] {
+    --bg-main: #1e1e2e;
+    --bg-card: #181825;
+    --bg-input: #11111b;
+    --border-color: #313244;
+    --border-light: #cba6f7;
+    --text-primary: #cdd6f4;
+    --text-secondary: #a6adc8;
+    --text-muted: #bac2de;
+    --text-muted-alt: #585b70;
+    --accent-primary: #cba6f7;
+    --accent-success: #a6e3a1;
+    --accent-error: #f38ba8;
+}
+
+/* 6. DRACULA (Classic Dark Vampire Theme with Purple/Pink Accent) */
+[data-theme="dracula"] {
+    --bg-main: #282a36;
+    --bg-card: #1e1f29;
+    --bg-input: #21222c;
+    --border-color: #44475a;
+    --border-light: #bd93f9;
+    --text-primary: #f8f8f2;
+    --text-secondary: #6272a4;
+    --text-muted: #8be9fd;
+    --text-muted-alt: #ff79c6;
+    --accent-primary: #bd93f9;
+    --accent-success: #50fa7b;
+    --accent-error: #ff5555;
 }
