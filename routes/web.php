@@ -24,7 +24,7 @@ Route::group(['domain' => 'dashboard.' . $routeDomain], function () {
 
 // 2. Wildcard client subdomains dynamically proxied
 Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
-    Route::get('/{any?}', function ($subdomain, $any = null) {
+    Route::any('/{any?}', function ($subdomain, $any = null) {
         $reserved = ['www', 'admin', 'api', 'mail', 'app', 'dev', 'status', 'portal', 'dashboard'];
         if (in_array(strtolower($subdomain), $reserved)) {
             if (in_array(strtolower($subdomain), ['admin', 'dashboard'])) {
@@ -76,6 +76,40 @@ Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
 
         if (!File::exists($filePath) || File::isDirectory($filePath)) {
             abort(404, "File not found inside instance.");
+        }
+
+        // Execute PHP file and buffer response output
+        if (str_ends_with($filePath, '.php')) {
+            ob_start();
+            try {
+                $oldCwd = getcwd();
+                chdir(dirname($filePath));
+                
+                include $filePath;
+                
+                chdir($oldCwd);
+                $output = ob_get_clean();
+
+                $statusCode = http_response_code();
+                if ($statusCode === false || $statusCode === 200) {
+                    $statusCode = 200;
+                }
+
+                $response = response($output, $statusCode);
+
+                // Set headers set by the PHP script
+                foreach (headers_list() as $header) {
+                    if (strpos($header, ':') !== false) {
+                        list($name, $value) = explode(':', $header, 2);
+                        $response->header(trim($name), trim($value));
+                    }
+                }
+
+                return $response;
+            } catch (\Throwable $e) {
+                ob_end_clean();
+                return response("PHP Execution Error: " . $e->getMessage(), 500);
+            }
         }
 
         $mime = File::mimeType($filePath);

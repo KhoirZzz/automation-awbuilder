@@ -273,4 +273,95 @@ class SandboxTest extends TestCase
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('templates/gojek'));
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
     }
+
+    public function test_client_subdomain_php_execution(): void
+    {
+        config(['app.url' => 'https://mockbuild.shop']);
+
+        // Mock base paths
+        config([
+            'deploy.template_base_path' => storage_path('templates'),
+            'deploy.instance_base_path' => storage_path('deployments_test'),
+        ]);
+
+        $instancePath = storage_path('deployments_test/client-test-slug');
+        \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true, true);
+        
+        \Illuminate\Support\Facades\File::put($instancePath . '/hello.php', '<?php echo "Hello PHP World";');
+
+        // Create a dummy template
+        $template = ServiceTemplate::create([
+            'key' => 'gojek-test',
+            'name' => 'Gojek Test Template',
+            'template_path' => 'gojek',
+            'is_active' => true,
+        ]);
+
+        // Create active deployment in DB
+        Deployment::create([
+            'source' => 'telegram',
+            'service_template_id' => $template->id,
+            'lead_reference' => 'test_lead_php',
+            'client_slug' => 'client-test-slug',
+            'status' => \App\Enums\DeploymentStatus::ACTIVE->value,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+        ]);
+
+        $response = $this->get('http://client-test-slug.mockbuild.shop/hello.php');
+        $response->assertStatus(200);
+        $response->assertSee('Hello PHP World');
+
+        // Clean up
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+    }
+
+    public function test_client_subdomain_php_execution_with_redirect_and_headers(): void
+    {
+        config(['app.url' => 'https://mockbuild.shop']);
+
+        // Mock base paths
+        config([
+            'deploy.template_base_path' => storage_path('templates'),
+            'deploy.instance_base_path' => storage_path('deployments_test'),
+        ]);
+
+        $instancePath = storage_path('deployments_test/client-test-slug-redirect');
+        \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true, true);
+        
+        \Illuminate\Support\Facades\File::put(
+            $instancePath . '/redirect.php', 
+            '<?php header("Location: /target.php"); http_response_code(302); echo "Redirecting...";'
+        );
+
+        // Create a dummy template
+        $template = ServiceTemplate::create([
+            'key' => 'gojek-test-2',
+            'name' => 'Gojek Test Template 2',
+            'template_path' => 'gojek',
+            'is_active' => true,
+        ]);
+
+        // Create active deployment in DB
+        Deployment::create([
+            'source' => 'telegram',
+            'service_template_id' => $template->id,
+            'lead_reference' => 'test_lead_php_redirect',
+            'client_slug' => 'client-test-slug-redirect',
+            'status' => \App\Enums\DeploymentStatus::ACTIVE->value,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+        ]);
+
+        $response = $this->get('http://client-test-slug-redirect.mockbuild.shop/redirect.php');
+        
+        // Assert we got status code 302 and the response body
+        $response->assertStatus(302);
+        $response->assertSee('Redirecting...');
+
+        // Clean up
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+    }
 }
