@@ -168,7 +168,7 @@ export default function Agent() {
     };
 
     return (
-        <div className="font-mono text-xs">
+        <div className="font-mono text-xs h-full">
             <Card 
                 title="AI Worker Workspace"
                 action={
@@ -184,7 +184,7 @@ export default function Agent() {
                         </Button>
                     </div>
                 }
-                className="flex flex-col h-[calc(100vh-140px)] lg:h-[650px]"
+                className="flex flex-col h-full lg:h-[650px]"
             >
                         {/* Conversation Box */}
                         {passkey.length < 6 ? (

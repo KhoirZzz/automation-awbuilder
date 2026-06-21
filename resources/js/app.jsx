@@ -330,8 +330,11 @@ function App() {
                 </button>
             </nav>
 
-            {/* Main Content Area */}
-            <main className="flex-1 bg-black px-4 py-6 md:px-8 md:py-8 lg:px-12 lg:py-10 overflow-y-auto max-w-7xl w-full pb-24 lg:pb-10">
+            <main className={`flex-1 bg-black max-w-7xl w-full ${
+                activeTab === 'agent'
+                    ? 'h-[calc(100vh-120px)] lg:h-auto overflow-hidden lg:overflow-y-auto p-4 md:p-8 lg:px-12 lg:py-10 lg:pb-10'
+                    : 'overflow-y-auto px-4 py-6 md:px-8 md:py-8 lg:px-12 lg:py-10 pb-24 lg:pb-10'
+            }`}>
                 {renderView()}
             </main>
         </div>
