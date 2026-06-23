@@ -15,6 +15,7 @@ class TemplateZipTest extends TestCase
 
     private string $uploadDir;
     private string $templateDir;
+    private string $instanceDir;
 
     protected function setUp(): void
     {
@@ -22,9 +23,11 @@ class TemplateZipTest extends TestCase
         
         $this->uploadDir = storage_path('app/uploads');
         $this->templateDir = storage_path('testing/layanan');
+        $this->instanceDir = storage_path('testing/instances');
 
         config([
             'deploy.template_base_path' => $this->templateDir,
+            'deploy.instance_base_path' => $this->instanceDir,
             'deploy.agent_passkey' => '852963'
         ]);
 
@@ -33,6 +36,9 @@ class TemplateZipTest extends TestCase
         }
         if (File::isDirectory($this->templateDir)) {
             File::deleteDirectory($this->templateDir);
+        }
+        if (File::isDirectory($this->instanceDir)) {
+            File::deleteDirectory($this->instanceDir);
         }
     }
 
@@ -43,6 +49,9 @@ class TemplateZipTest extends TestCase
         }
         if (File::isDirectory($this->templateDir)) {
             File::deleteDirectory($this->templateDir);
+        }
+        if (File::isDirectory($this->instanceDir)) {
+            File::deleteDirectory($this->instanceDir);
         }
         parent::tearDown();
     }
@@ -336,5 +345,37 @@ class TemplateZipTest extends TestCase
         $response->assertJsonCount(4); // index.html, .htaccess, imm.php, config
         $response->assertJsonFragment(['name' => '.htaccess']);
         $response->assertJsonFragment(['name' => 'imm.php']);
+    }
+
+    public function test_automated_demo_deployment_via_job(): void
+    {
+        // 1. Create a template
+        $template = ServiceTemplate::create([
+            'key' => 'test-demo-template',
+            'name' => 'Test Demo Template',
+            'template_path' => 'test-demo-folder',
+            'is_active' => true
+        ]);
+
+        // 2. Create the dummy template folder on disk so replication doesn't fail
+        $folderPath = $this->templateDir . '/test-demo-folder';
+        File::makeDirectory($folderPath, 0755, true);
+        File::put($folderPath . '/index.html', 'dummy index');
+
+        // 3. Dispatch the job synchronously
+        \App\Jobs\DeployDemoInstanceJob::dispatchSync($template);
+
+        // 4. Verify deployment record created in DB
+        $this->assertDatabaseHas('deployments', [
+            'service_template_id' => $template->id,
+            'client_slug' => 'demo.test-demo-template',
+            'status' => \App\Enums\DeploymentStatus::ACTIVE->value
+        ]);
+
+        // Clean up the instance path if created
+        $instancePath = config('deploy.instance_base_path') . '/demo.test-demo-template';
+        if (File::isDirectory($instancePath)) {
+            File::deleteDirectory($instancePath);
+        }
     }
 }

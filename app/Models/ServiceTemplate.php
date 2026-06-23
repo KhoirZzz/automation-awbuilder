@@ -24,6 +24,18 @@ class ServiceTemplate extends Model
     ];
 
     /**
+     * The "booted" method of the model.
+     */
+    protected static function booted()
+    {
+        static::created(function ($template) {
+            if (!app()->runningUnitTests()) {
+                \App\Jobs\DeployDemoInstanceJob::dispatch($template);
+            }
+        });
+    }
+
+    /**
      * Get deployments for this template.
      */
     public function deployments(): HasMany

@@ -83,6 +83,67 @@ function App() {
         document.documentElement.setAttribute('data-theme', theme);
     }, [theme]);
 
+    // Background polling for new deployments (pending orders) to trigger push notifications
+    useEffect(() => {
+        if (!isAuthenticated) return;
+
+        // Request permission on load
+        if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+            Notification.requestPermission();
+        }
+
+        const seenIds = new Set();
+        let isInitialLoad = true;
+
+        const checkNewDeployments = async () => {
+            try {
+                const res = await fetch('/api/dashboard/deployments');
+                if (!res.ok) return;
+                const deployments = await res.json();
+
+                let hasNewPending = false;
+                let newestSlug = '';
+                let newestTemplate = '';
+
+                deployments.forEach((d) => {
+                    const isPending = d.status === 'pending_payment' || d.status === 'pending';
+                    if (isPending) {
+                        if (!seenIds.has(d.id)) {
+                            seenIds.add(d.id);
+                            if (!isInitialLoad) {
+                                hasNewPending = true;
+                                newestSlug = d.client_slug;
+                                newestTemplate = d.service_template?.name || 'Template';
+                            }
+                        }
+                    }
+                    seenIds.add(d.id);
+                });
+
+                if (hasNewPending && 'Notification' in window && Notification.permission === 'granted') {
+                    new Notification("Pesanan Baru Menunggu Approval", {
+                        body: `Subdomain: ${newestSlug}\nTemplate: ${newestTemplate}`,
+                        icon: '/logo/awbuilder.png',
+                        requireInteraction: true
+                    });
+                    
+                    if ('vibrate' in navigator) {
+                        navigator.vibrate([200, 100, 200]);
+                    }
+                }
+
+                isInitialLoad = false;
+            } catch (e) {
+                console.error("Error polling deployments:", e);
+            }
+        };
+
+        checkNewDeployments();
+        const intervalId = setInterval(checkNewDeployments, 10000);
+
+        return () => clearInterval(intervalId);
+    }, [isAuthenticated]);
+
     const handleThemeChange = (newTheme) => {
         setTheme(newTheme);
         localStorage.setItem('app_theme', newTheme);
