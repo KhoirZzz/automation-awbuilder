@@ -1047,7 +1047,7 @@ class DashboardController extends Controller
      */
     public function publicTemplates(): JsonResponse
     {
-        $templates = ServiceTemplate::where('is_active', true)->get(['key', 'name', 'category']);
+        $templates = ServiceTemplate::where('is_active', true)->get(['key', 'name', 'category', 'price']);
         return response()->json($templates);
     }
 

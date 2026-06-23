@@ -247,6 +247,13 @@ function Landing() {
                                                 }`}>
                                                     {t.name}
                                                 </span>
+                                                <div className="pt-1">
+                                                    <span className={`text-[11px] font-bold block ${
+                                                        selectedTemplate?.key === t.key ? 'text-white' : 'text-zinc-450'
+                                                    }`}>
+                                                        {t.price ? `Rp ${Number(t.price).toLocaleString('id-ID')}` : 'Gratis / Hubungi Admin'}
+                                                    </span>
+                                                </div>
                                             </div>
                                             <div className="flex justify-between items-end pt-4 border-t border-zinc-900/60 mt-auto">
                                                 <span className="text-[10px] text-zinc-500 font-semibold uppercase">Base Template</span>
@@ -333,7 +340,9 @@ function Landing() {
                                         <div className="pt-2 border-t border-zinc-900 flex justify-between items-center">
                                             <div>
                                                 <span className="text-[10px] text-zinc-500 block uppercase">Biaya Layanan</span>
-                                                <span className="text-white font-extrabold text-xs">Menunggu konfirmasi Admin (Hubungi @awbuilderadmin)</span>
+                                                <span className="text-white font-extrabold text-xs">
+                                                    {selectedTemplate.price ? `Rp ${Number(selectedTemplate.price).toLocaleString('id-ID')}` : 'Gratis / Hubungi Admin'}
+                                                </span>
                                             </div>
                                             <Button type="submit" variant="primary" loading={loading} className="uppercase font-bold tracking-wider text-xs">
                                                 Pesan & Deploy Layanan
