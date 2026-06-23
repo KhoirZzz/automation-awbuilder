@@ -12,6 +12,31 @@ const STAGES = [
     { key: 'completed', label: '6. Instance Deployment Live', desc: 'Deployment record committed as active in database.' }
 ];
 
+function calculatePriceForDuration(basePrice, duration) {
+    if (!basePrice) return 0;
+    const base = parseInt(basePrice, 10);
+    switch (duration) {
+        case '1_minggu':
+            return base;
+        case '1_bulan':
+            if (base <= 75000) {
+                return Math.round(base * 3.5);
+            }
+            return (base * 2) + 150000;
+        case '3_bulan':
+            const m3 = calculatePriceForDuration(base, '1_bulan');
+            return Math.round(m3 * 3 * 0.9);
+        case '6_bulan':
+            const m6 = calculatePriceForDuration(base, '1_bulan');
+            return Math.round(m6 * 6 * 0.8);
+        case '1_tahun':
+            const m12 = calculatePriceForDuration(base, '1_bulan');
+            return Math.round(m12 * 12 * 0.7);
+        default:
+            return base;
+    }
+}
+
 export default function Sandbox() {
     const [message, setMessage] = useState('');
     const [source, setSource] = useState('telegram');
@@ -50,14 +75,18 @@ export default function Sandbox() {
         fetchTemplates();
     }, []);
 
-    // Sync price automatically when serviceKey changes based on template's configured price
+    // Sync price automatically when serviceKey or durasi changes based on template's configured price
     useEffect(() => {
         if (!serviceKey) return;
         const selectedTemplate = templates.find(t => t.key === serviceKey);
-        if (selectedTemplate) {
-            setPrice(selectedTemplate.price !== null && selectedTemplate.price !== undefined ? selectedTemplate.price.toString() : '');
+        if (selectedTemplate && selectedTemplate.price !== null && selectedTemplate.price !== undefined) {
+            const basePrice = selectedTemplate.price;
+            const calculated = calculatePriceForDuration(basePrice, durasi);
+            setPrice(calculated.toString());
+        } else {
+            setPrice('');
         }
-    }, [serviceKey, templates]);
+    }, [serviceKey, durasi, templates]);
 
     const handleManualDeploy = async (e) => {
         e.preventDefault();

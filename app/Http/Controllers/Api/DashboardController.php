@@ -996,6 +996,8 @@ class DashboardController extends Controller
         $price = null;
         if (!empty($validated['price'])) {
             $price = (int)$validated['price'];
+        } elseif ($serviceTemplate->price) {
+            $price = \App\Support\LeadAnalysisValidator::calculatePriceForDuration((int)$serviceTemplate->price, $validated['durasi']);
         }
 
         // Map duration enum
@@ -1096,7 +1098,7 @@ class DashboardController extends Controller
         }
 
         // Calculate standard price based on duration
-        $price = null;
+        $price = $serviceTemplate->price ? \App\Support\LeadAnalysisValidator::calculatePriceForDuration((int)$serviceTemplate->price, $validated['durasi']) : null;
 
         // Build DTO
         $result = new \App\DataTransferObjects\LeadAnalysisResult(

@@ -4,6 +4,31 @@ import { Card } from './components/Card';
 import { Button } from './components/Button';
 import { Alert } from './components/Alert';
 
+function calculatePriceForDuration(basePrice, duration) {
+    if (!basePrice) return 0;
+    const base = parseInt(basePrice, 10);
+    switch (duration) {
+        case '1_minggu':
+            return base;
+        case '1_bulan':
+            if (base <= 75000) {
+                return Math.round(base * 3.5);
+            }
+            return (base * 2) + 150000;
+        case '3_bulan':
+            const m3 = calculatePriceForDuration(base, '1_bulan');
+            return Math.round(m3 * 3 * 0.9);
+        case '6_bulan':
+            const m6 = calculatePriceForDuration(base, '1_bulan');
+            return Math.round(m6 * 6 * 0.8);
+        case '1_tahun':
+            const m12 = calculatePriceForDuration(base, '1_bulan');
+            return Math.round(m12 * 12 * 0.7);
+        default:
+            return base;
+    }
+}
+
 function Landing() {
     const [templates, setTemplates] = useState([]);
     const [loadingTemplates, setLoadingTemplates] = useState(true);

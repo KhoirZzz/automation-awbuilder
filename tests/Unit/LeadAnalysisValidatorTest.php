@@ -165,4 +165,24 @@ class LeadAnalysisValidatorTest extends TestCase
             $this->assertEquals($case['expected'], $result->price, "Failed for input: " . $case['input']);
         }
     }
+
+    public function test_calculate_price_for_duration(): void
+    {
+        // Test base price 100,000 (W)
+        $w100 = 100000;
+        $this->assertEquals(100000, LeadAnalysisValidator::calculatePriceForDuration($w100, '1_minggu'));
+        $this->assertEquals(350000, LeadAnalysisValidator::calculatePriceForDuration($w100, '1_bulan')); // 2 * 100k + 150k = 350k
+        $this->assertEquals((int)(350000 * 3 * 0.9), LeadAnalysisValidator::calculatePriceForDuration($w100, '3_bulan'));
+        $this->assertEquals((int)(350000 * 6 * 0.8), LeadAnalysisValidator::calculatePriceForDuration($w100, '6_bulan'));
+        $this->assertEquals((int)(350000 * 12 * 0.7), LeadAnalysisValidator::calculatePriceForDuration($w100, '1_tahun'));
+
+        // Test base price 125,000 (W)
+        $w125 = 125000;
+        $this->assertEquals(125000, LeadAnalysisValidator::calculatePriceForDuration($w125, '1_minggu'));
+        $this->assertEquals(400000, LeadAnalysisValidator::calculatePriceForDuration($w125, '1_bulan')); // 2 * 125k + 150k = 400k
+
+        // Test base price 50,000 (W <= 75k)
+        $w50 = 50000;
+        $this->assertEquals(175000, LeadAnalysisValidator::calculatePriceForDuration($w50, '1_bulan')); // 3.5 * 50k = 175k
+    }
 }

@@ -125,7 +125,7 @@ class LeadAnalysisValidator
         }
 
         if (empty($price) && $serviceTemplate && !empty($serviceTemplate->price)) {
-            $price = (int)$serviceTemplate->price;
+            $price = self::calculatePriceForDuration((int)$serviceTemplate->price, $durationString);
         }
 
         $expiresAt = $durationEnum->calculateExpiry();
@@ -140,5 +140,33 @@ class LeadAnalysisValidator
             price: $price,
             rawLlmResponse: json_encode($rawResponse)
         );
+    }
+
+    /**
+     * Calculate price based on base price (1 week) and selected duration.
+     */
+    public static function calculatePriceForDuration(int $basePrice, string $duration): int
+    {
+        switch ($duration) {
+            case '1_minggu':
+                return $basePrice;
+            case '1_bulan':
+                // Formula: 2 * W + 150k
+                if ($basePrice <= 75000) {
+                    return (int)($basePrice * 3.5);
+                }
+                return ($basePrice * 2) + 150000;
+            case '3_bulan':
+                $monthlyPrice = self::calculatePriceForDuration($basePrice, '1_bulan');
+                return (int)($monthlyPrice * 3 * 0.9);
+            case '6_bulan':
+                $monthlyPrice = self::calculatePriceForDuration($basePrice, '1_bulan');
+                return (int)($monthlyPrice * 6 * 0.8);
+            case '1_tahun':
+                $monthlyPrice = self::calculatePriceForDuration($basePrice, '1_bulan');
+                return (int)($monthlyPrice * 12 * 0.7);
+            default:
+                return $basePrice;
+        }
     }
 }
