@@ -15,7 +15,7 @@ class VerifyTelegramSignature
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $token = env('TELEGRAM_BOT_SECRET_TOKEN');
+        $token = config('services.telegram.bot_secret_token');
         $headerToken = $request->header('X-Telegram-Bot-Api-Secret-Token');
 
         if (empty($token) || $headerToken !== $token) {

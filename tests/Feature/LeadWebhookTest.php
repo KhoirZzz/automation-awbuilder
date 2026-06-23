@@ -33,8 +33,10 @@ class LeadWebhookTest extends TestCase
     public function test_telegram_webhook_with_valid_signature_dispatches_job(): void
     {
         $secretToken = 'my-tg-secret-token';
-        config(['app.env' => 'production']); // To ensure env checks run as expected
-        putenv("TELEGRAM_BOT_SECRET_TOKEN={$secretToken}");
+        config([
+            'app.env' => 'production',
+            'services.telegram.bot_secret_token' => $secretToken
+        ]);
 
         $response = $this->withHeaders([
             'X-Telegram-Bot-Api-Secret-Token' => $secretToken
@@ -59,7 +61,7 @@ class LeadWebhookTest extends TestCase
     public function test_telegram_webhook_deduplication(): void
     {
         $secretToken = 'my-tg-secret-token';
-        putenv("TELEGRAM_BOT_SECRET_TOKEN={$secretToken}");
+        config(['services.telegram.bot_secret_token' => $secretToken]);
 
         $payload = [
             'message' => [
@@ -116,7 +118,7 @@ class LeadWebhookTest extends TestCase
     public function test_whatsapp_webhook_with_valid_signature_dispatches_job(): void
     {
         $appSecret = 'my-wa-app-secret';
-        putenv("WHATSAPP_APP_SECRET={$appSecret}");
+        config(['services.whatsapp.app_secret' => $appSecret]);
 
         $payload = [
             'entry' => [
@@ -157,7 +159,7 @@ class LeadWebhookTest extends TestCase
     public function test_whatsapp_webhook_verification_challenge_passes(): void
     {
         $verifyToken = 'my-verify-token';
-        putenv("WHATSAPP_VERIFY_TOKEN={$verifyToken}");
+        config(['services.whatsapp.verify_token' => $verifyToken]);
 
         $response = $this->get('/api/webhook/whatsapp?' . http_build_query([
             'hub_mode' => 'subscribe',

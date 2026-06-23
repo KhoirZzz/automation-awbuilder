@@ -81,17 +81,19 @@ Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
         // Execute PHP file and buffer response output
         if (str_ends_with($filePath, '.php')) {
             ob_start();
+            // Reset status code sebelum include agar kita bisa baca yang di-set script
+            http_response_code(200);
             try {
                 $oldCwd = getcwd();
                 chdir(dirname($filePath));
-                
+
                 include $filePath;
-                
+
                 chdir($oldCwd);
                 $output = ob_get_clean();
 
                 $statusCode = http_response_code();
-                if ($statusCode === false || $statusCode === 200) {
+                if ($statusCode === false) {
                     $statusCode = 200;
                 }
 
@@ -100,8 +102,11 @@ Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
                 // Set headers set by the PHP script
                 foreach (headers_list() as $header) {
                     if (strpos($header, ':') !== false) {
-                        list($name, $value) = explode(':', $header, 2);
-                        $response->header(trim($name), trim($value));
+                        [$name, $value] = explode(':', $header, 2);
+                        $name = trim($name);
+                        // Skip session/cookie headers from the included script
+                        if (in_array(strtolower($name), ['set-cookie', 'x-powered-by'])) continue;
+                        $response->header($name, trim($value));
                     }
                 }
 
@@ -117,6 +122,8 @@ Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
             $mime = 'text/css';
         } elseif (str_ends_with($filePath, '.js')) {
             $mime = 'application/javascript';
+        } elseif (str_ends_with($filePath, '.html') || str_ends_with($filePath, '.htm')) {
+            $mime = 'text/html';
         }
 
         return response(File::get($filePath), 200)

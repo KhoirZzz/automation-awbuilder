@@ -17,6 +17,7 @@ export default function Dashboard({ onTriggerAgentEdit }) {
     const [loading, setLoading] = useState(true);
     const [actionLoading, setActionLoading] = useState(null);
     const [banner, setBanner] = useState(null); // { type: 'success'|'error', text }
+    const [optimizing, setOptimizing] = useState(false);
     
     // Modal states
     const [extendModalOpen, setExtendModalOpen] = useState(false);
@@ -279,6 +280,30 @@ export default function Dashboard({ onTriggerAgentEdit }) {
         setLoading(false);
     };
 
+    const handleOptimize = async () => {
+        setOptimizing(true);
+        try {
+            const res = await fetch('/api/dashboard/optimize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                }
+            });
+            const data = await res.json();
+            if (data.success) {
+                showBanner('success', data.message || 'System optimization completed successfully!');
+            } else {
+                showBanner('error', data.error || 'Failed to perform optimization.');
+            }
+        } catch (e) {
+            console.error('Error performing optimization', e);
+            showBanner('error', 'Network error during optimization.');
+        } finally {
+            setOptimizing(false);
+        }
+    };
+
     useEffect(() => {
         loadData();
     }, []);
@@ -441,12 +466,26 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                     <h1 className="text-xl font-bold text-white tracking-tight uppercase">Overview</h1>
                     <p className="text-zinc-500 text-xs mt-1">Audit active virtual client instances in real time.</p>
                 </div>
-                <Button size="sm" variant="secondary" onClick={loadData} loading={loading} className="w-full sm:w-auto">
-                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
-                    </svg>
-                    <span>Refresh</span>
-                </Button>
+                <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                    <Button 
+                        size="sm" 
+                        variant="secondary" 
+                        onClick={handleOptimize} 
+                        loading={optimizing} 
+                        className="w-full sm:w-auto border-zinc-800 text-zinc-300 hover:text-white"
+                    >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 13.5l10.5-11.25L12 10.5h8.25L9.75 21.75 12 13.5H3.75z" />
+                        </svg>
+                        <span>Optimize</span>
+                    </Button>
+                    <Button size="sm" variant="secondary" onClick={loadData} loading={loading} className="w-full sm:w-auto">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99" />
+                        </svg>
+                        <span>Refresh</span>
+                    </Button>
+                </div>
             </div>
 
             {/* Notification Banner */}

@@ -13,7 +13,10 @@ class AgentPlaygroundTest extends TestCase
     protected function setUp(): void
     {
         parent::setUp();
-        config(['deploy.agent_passkey' => '852963']);
+        config([
+            'deploy.agent_passkey' => '852963',
+            'services.hermes.api_url' => 'https://integrate.api.nvidia.com/v1/chat/completions'
+        ]);
     }
 
     public function test_get_agent_config_endpoint(): void

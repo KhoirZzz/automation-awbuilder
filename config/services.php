@@ -41,4 +41,15 @@ return [
         'model' => env('HERMES_MODEL', 'hermes3'),
     ],
 
+    'telegram' => [
+        'bot_token' => env('TELEGRAM_BOT_TOKEN', ''),
+        'bot_secret_token' => env('TELEGRAM_BOT_SECRET_TOKEN', ''),
+        'admin_chat_id' => env('TELEGRAM_ADMIN_CHAT_ID', ''),
+    ],
+
+    'whatsapp' => [
+        'verify_token' => env('WHATSAPP_VERIFY_TOKEN', ''),
+        'app_secret' => env('WHATSAPP_APP_SECRET', ''),
+    ],
+
 ];

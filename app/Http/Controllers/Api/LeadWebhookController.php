@@ -33,7 +33,7 @@ class LeadWebhookController extends Controller
         }
 
         if (preg_match('/^\/approve\s+(\S+)(?:\s+(\d+))?/i', $messageText, $matches)) {
-            $adminChatId = env('TELEGRAM_ADMIN_CHAT_ID');
+            $adminChatId = config('services.telegram.admin_chat_id');
             if (empty($adminChatId) || (string)$chatId !== (string)$adminChatId) {
                 $botService->sendMessage($chatId, "❌ Anda tidak memiliki otorisasi untuk melakukan tindakan ini.");
                 return response()->json(['status' => 'received']);
@@ -111,7 +111,7 @@ class LeadWebhookController extends Controller
     {
         // WhatsApp webhook verification challenge (GET request)
         if ($request->isMethod('GET') && $request->has('hub_mode') && $request->has('hub_challenge')) {
-            $verifyToken = env('WHATSAPP_VERIFY_TOKEN');
+            $verifyToken = config('services.whatsapp.verify_token');
             if ($request->input('hub_verify_token') === $verifyToken) {
                 return response($request->input('hub_challenge'), 200)
                     ->header('Content-Type', 'text/plain');

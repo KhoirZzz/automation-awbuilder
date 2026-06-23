@@ -1123,7 +1123,7 @@ class DashboardController extends Controller
             $clientUrl = "http://{$clientSlug}.{$baseDomain}";
 
             // Notify Admin via Telegram bot
-            $adminChatId = env('TELEGRAM_ADMIN_CHAT_ID');
+            $adminChatId = config('services.telegram.admin_chat_id');
             if ($adminChatId) {
                 try {
                     $botService = app(\App\Services\TelegramBotService::class);
@@ -1698,4 +1698,29 @@ class DashboardController extends Controller
             // Silence permission errors
         }
     }
+
+    /**
+     * Perform system clear and cache optimization.
+     */
+    public function optimize(\Illuminate\Http\Request $request): \Illuminate\Http\JsonResponse
+    {
+        try {
+            \Illuminate\Support\Facades\Log::channel('deploy-audit')->info('Manual one-click system optimization triggered via Admin Dashboard.');
+
+            \Illuminate\Support\Facades\Artisan::call('optimize:clear');
+            \Illuminate\Support\Facades\Artisan::call('optimize');
+
+            return response()->json([
+                'success' => true,
+                'message' => 'System optimization completed successfully! Cached config/routes and cleared temp caches.'
+            ]);
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::channel('deploy-audit')->error('Failed to optimize system: ' . $e->getMessage());
+            return response()->json([
+                'success' => false,
+                'error' => 'Optimization failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
 }
+

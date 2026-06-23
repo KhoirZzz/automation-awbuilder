@@ -166,9 +166,9 @@ function Landing() {
 
                                 <div className="flex flex-col md:flex-row items-center gap-6 p-4 border border-zinc-850 rounded bg-zinc-950">
                                     <div className="shrink-0 bg-white p-2 rounded">
-                                        {/* Mock QRIS code using public qrserver API */}
+                                        {/* Real QRIS code from static logo directory */}
                                         <img 
-                                            src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=qris_payment_mock_${checkoutResult.deployment.client_slug}`} 
+                                            src="/logo/qris.jpg" 
                                             alt="QRIS Payment" 
                                             className="h-32 w-32 object-contain"
                                         />

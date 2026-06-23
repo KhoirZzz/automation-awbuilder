@@ -15,7 +15,7 @@ class VerifyWhatsappSignature
      */
     public function handle(Request $request, Closure $next): Response
     {
-        $secret = env('WHATSAPP_APP_SECRET');
+        $secret = config('services.whatsapp.app_secret');
         $header = $request->header('X-Hub-Signature-256');
 
         if (empty($secret) || empty($header)) {

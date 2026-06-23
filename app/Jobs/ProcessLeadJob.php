@@ -132,7 +132,13 @@ class ProcessLeadJob implements ShouldQueue
                 $qrisUrl = "https://api.qrserver.com/v1/create-qr-code/?size=300x300&data=qris_payment_mock_" . $analysisResult->clientSlug;
                 
                 // Auto-detect static QRIS image in public directory
-                if (file_exists(public_path('qris.png'))) {
+                if (file_exists(public_path('logo/qris.png'))) {
+                    $qrisUrl = asset('logo/qris.png');
+                } elseif (file_exists(public_path('logo/qris.jpg'))) {
+                    $qrisUrl = asset('logo/qris.jpg');
+                } elseif (file_exists(public_path('logo/qris.jpeg'))) {
+                    $qrisUrl = asset('logo/qris.jpeg');
+                } elseif (file_exists(public_path('qris.png'))) {
                     $qrisUrl = asset('qris.png');
                 } elseif (file_exists(public_path('qris.jpg'))) {
                     $qrisUrl = asset('qris.jpg');
@@ -147,7 +153,7 @@ class ProcessLeadJob implements ShouldQueue
                 $botService->sendPhoto($chatId, $qrisUrl, $caption);
 
                 // Notify admin
-                $adminChatId = env('TELEGRAM_ADMIN_CHAT_ID');
+                $adminChatId = config('services.telegram.admin_chat_id');
                 if ($adminChatId) {
                     $botService->sendMessage($adminChatId, "<b>🔔 PEMESANAN BARU MENUNGGU PERSETUJUAN</b>\n\n• Client Chat ID: <code>{$chatId}</code>\n• Subdomain: <b>{$analysisResult->clientSlug}</b>\n• Durasi Sewa: <b>{$analysisResult->duration->value}</b>\n• Harga: <b>{$formattedPrice}</b>\n\nSilakan verifikasi bukti pembayaran dari client di @awbuilderadmin lalu ketik:\n<code>/approve {$analysisResult->clientSlug}</code>");
                 }

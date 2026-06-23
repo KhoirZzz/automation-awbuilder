@@ -24,6 +24,7 @@ Route::post('/public/deploy', [DashboardController::class, 'publicDeploy']);
 
 Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey::class)->group(function () {
     Route::get('/stats', [DashboardController::class, 'stats']);
+    Route::post('/optimize', [DashboardController::class, 'optimize']);
     Route::get('/deployments', [DashboardController::class, 'deployments']);
     Route::get('/templates', [DashboardController::class, 'templates']);
     Route::post('/templates', [DashboardController::class, 'storeTemplate']);
