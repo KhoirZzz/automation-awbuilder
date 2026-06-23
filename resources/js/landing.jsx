@@ -168,7 +168,7 @@ function Landing() {
                                     <div className="shrink-0 bg-white p-2 rounded">
                                         {/* Real QRIS code from static logo directory */}
                                         <img 
-                                            src="/logo/qris.jpg" 
+                                            src="/logo/qris.png" 
                                             alt="QRIS Payment" 
                                             className="h-32 w-32 object-contain"
                                         />
