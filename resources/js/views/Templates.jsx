@@ -49,6 +49,7 @@ export default function Templates() {
     const [newCategory, setNewCategory] = useState('');
     const [newPath, setNewPath] = useState('');
     const [newIsActive, setNewIsActive] = useState(true);
+    const [newPrice, setNewPrice] = useState('');
 
     // ZIP upload state
     const [selectedFile, setSelectedFile] = useState(null);
@@ -58,6 +59,12 @@ export default function Templates() {
     const [extractionKeys, setExtractionKeys] = useState({});
     const [extractionNames, setExtractionNames] = useState({});
     const [extractionCategories, setExtractionCategories] = useState({});
+    const [extractionPrices, setExtractionPrices] = useState({});
+
+    // Edit Price Modal States
+    const [editPriceModalOpen, setEditPriceModalOpen] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState(null);
+    const [editPrice, setEditPrice] = useState('');
 
     // Hold-to-extract state
     const [holdingZip, setHoldingZip] = useState(null);
@@ -295,6 +302,38 @@ export default function Templates() {
         );
     };
 
+    const handleOpenEditPrice = (template) => {
+        setEditingTemplate(template);
+        setEditPrice(template.price !== null && template.price !== undefined ? template.price.toString() : '');
+        setEditPriceModalOpen(true);
+    };
+
+    const handleUpdatePrice = async (e) => {
+        e.preventDefault();
+        if (!editingTemplate) return;
+        try {
+            const res = await fetch(`/api/dashboard/templates/${editingTemplate.id}/price`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    price: editPrice ? parseInt(editPrice, 10) : null
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                setEditPriceModalOpen(false);
+                setEditingTemplate(null);
+                setEditPrice('');
+                fetchTemplates();
+                showBanner('success', `Harga blueprint "${data.template.name}" berhasil diperbarui.`);
+            } else {
+                showBanner('error', data.error || 'Gagal memperbarui harga.');
+            }
+        } catch (e) {
+            showBanner('error', 'Gagal menghubungi server untuk memperbarui harga.');
+        }
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         try {
@@ -306,7 +345,8 @@ export default function Templates() {
                     name: newName,
                     category: newCategory,
                     template_path: newPath,
-                    is_active: newIsActive
+                    is_active: newIsActive,
+                    price: newPrice ? parseInt(newPrice, 10) : null
                 })
             });
             const data = await res.json();
@@ -320,6 +360,7 @@ export default function Templates() {
                 setNewName('');
                 setNewCategory('');
                 setNewPath('');
+                setNewPrice('');
                 fetchTemplates();
                 showBanner('success', `Blueprint "${newName}" berhasil diregistrasi secara manual.`);
             }
@@ -369,6 +410,7 @@ export default function Templates() {
         const key = (extractionKeys[zipFilename] || '').trim();
         const name = (extractionNames[zipFilename] || '').trim();
         const category = (extractionCategories[zipFilename] || '').trim();
+        const price = (extractionPrices[zipFilename] || '').trim();
 
         if (!key || !name) {
             showBanner('warning', 'Silakan isi Template Key dan Display Name terlebih dahulu.');
@@ -387,7 +429,7 @@ export default function Templates() {
             setHoldProgress((prev) => {
                 if (prev >= 100) {
                     clearInterval(holdIntervalRef.current);
-                    triggerExtraction(zipFilename, key, name, category);
+                    triggerExtraction(zipFilename, key, name, category, price);
                     return 100;
                 }
                 return prev + 5; // Takes 1.0s to hit 100% (20 ticks of 50ms)
@@ -403,14 +445,20 @@ export default function Templates() {
         setHoldProgress(0);
     };
 
-    const triggerExtraction = async (filename, key, name, category) => {
+    const triggerExtraction = async (filename, key, name, category, price) => {
         stopHold();
         setLoading(true);
         try {
             const res = await fetch('/api/dashboard/templates/extract-zip', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ filename, key, name, category })
+                body: JSON.stringify({ 
+                    filename, 
+                    key, 
+                    name, 
+                    category,
+                    price: price ? parseInt(price, 10) : null
+                })
             });
             const data = await res.json();
 
@@ -427,6 +475,11 @@ export default function Templates() {
                     return next;
                 });
                 setExtractionCategories(prev => {
+                    const next = { ...prev };
+                    delete next[filename];
+                    return next;
+                });
+                setExtractionPrices(prev => {
                     const next = { ...prev };
                     delete next[filename];
                     return next;
@@ -542,6 +595,23 @@ export default function Templates() {
                                         <div>
                                             <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider block">Template Folder Name</span>
                                             <span className="text-zinc-300 font-mono text-xs">{tpl.template_path}</span>
+                                        </div>
+                                        <div className="flex items-center justify-between">
+                                            <div>
+                                                <span className="text-zinc-500 text-[10px] font-semibold uppercase tracking-wider block">Price</span>
+                                                <span className="text-white font-bold text-xs">
+                                                    {tpl.price ? `Rp ${Number(tpl.price).toLocaleString('id-ID')}` : 'Rp 0'}
+                                                </span>
+                                            </div>
+                                            <button 
+                                                onClick={() => handleOpenEditPrice(tpl)}
+                                                className="text-zinc-550 hover:text-white p-1.5 rounded hover:bg-zinc-900 border border-transparent hover:border-zinc-800 transition-all"
+                                                title="Edit Harga"
+                                            >
+                                                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125" />
+                                                </svg>
+                                            </button>
                                         </div>
                                          <div className="pt-4 border-t border-zinc-900 flex flex-col gap-3">
                                              <div className="flex items-center justify-between">
@@ -687,6 +757,16 @@ export default function Templates() {
                                                     }}
                                                     className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-2 text-white placeholder-zinc-700 focus:outline-none w-full sm:w-28"
                                                 />
+                                                <input
+                                                    type="number"
+                                                    placeholder="Price (Rp)"
+                                                    value={extractionPrices[zip.filename] || ''}
+                                                    onChange={(e) => {
+                                                        const val = e.target.value;
+                                                        setExtractionPrices(prev => ({ ...prev, [zip.filename]: val }));
+                                                    }}
+                                                    className="bg-zinc-900 border border-zinc-800 rounded px-2.5 py-2 text-white placeholder-zinc-700 focus:outline-none w-full sm:w-28"
+                                                />
 
                                                 {/* Hold-to-Extract Button */}
                                                 <button
@@ -784,6 +864,16 @@ export default function Templates() {
                             className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-650 focus:outline-none focus:border-zinc-500"
                         />
                     </div>
+                    <div className="space-y-1.5">
+                        <label className="block font-semibold text-zinc-400 uppercase">Default Price (Rp)</label>
+                        <input
+                            type="number"
+                            placeholder="e.g. 100000"
+                            value={newPrice}
+                            onChange={(e) => setNewPrice(e.target.value)}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-650 focus:outline-none focus:border-zinc-500"
+                        />
+                    </div>
                     <div className="flex items-center gap-2.5 pt-2">
                         <input
                             type="checkbox"
@@ -795,6 +885,32 @@ export default function Templates() {
                         <label htmlFor="isActiveCheckbox" className="font-semibold text-zinc-450 uppercase cursor-pointer select-none">
                             Activate on creation
                         </label>
+                    </div>
+                </form>
+            </Modal>
+
+            {/* Edit Price Modal */}
+            <Modal
+                isOpen={editPriceModalOpen}
+                onClose={() => { setEditPriceModalOpen(false); setEditingTemplate(null); }}
+                title={editingTemplate ? `Edit Price: ${editingTemplate.name}` : 'Edit Price'}
+                footer={
+                    <>
+                        <Button variant="secondary" onClick={() => { setEditPriceModalOpen(false); setEditingTemplate(null); }}>Batal</Button>
+                        <Button variant="primary" onClick={handleUpdatePrice}>Simpan</Button>
+                    </>
+                }
+            >
+                <form onSubmit={handleUpdatePrice} className="space-y-4 text-left font-mono text-xs">
+                    <div className="space-y-1.5">
+                        <label className="block font-semibold text-zinc-400 uppercase">Harga Layanan (Rp)</label>
+                        <input
+                            type="number"
+                            placeholder="Contoh: 150000 (biarkan kosong untuk gratis/kontak admin)"
+                            value={editPrice}
+                            onChange={(e) => setEditPrice(e.target.value)}
+                            className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-650 focus:outline-none focus:border-zinc-500"
+                        />
                     </div>
                 </form>
             </Modal>

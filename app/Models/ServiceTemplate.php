@@ -16,6 +16,7 @@ class ServiceTemplate extends Model
         'category',
         'template_path',
         'is_active',
+        'price',
     ];
 
     protected $casts = [

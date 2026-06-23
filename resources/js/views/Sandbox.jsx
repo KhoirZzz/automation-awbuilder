@@ -50,6 +50,15 @@ export default function Sandbox() {
         fetchTemplates();
     }, []);
 
+    // Sync price automatically when serviceKey changes based on template's configured price
+    useEffect(() => {
+        if (!serviceKey) return;
+        const selectedTemplate = templates.find(t => t.key === serviceKey);
+        if (selectedTemplate) {
+            setPrice(selectedTemplate.price !== null && selectedTemplate.price !== undefined ? selectedTemplate.price.toString() : '');
+        }
+    }, [serviceKey, templates]);
+
     const handleManualDeploy = async (e) => {
         e.preventDefault();
         

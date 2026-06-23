@@ -136,6 +136,7 @@ class DashboardController extends Controller
             'category' => 'nullable|string',
             'template_path' => 'required|string',
             'is_active' => 'boolean',
+            'price' => 'nullable|integer|min:0',
         ]);
 
         $template = ServiceTemplate::create($validated);
@@ -890,6 +891,7 @@ class DashboardController extends Controller
             'key' => 'required|string|unique:service_templates,key|regex:/^[a-z0-9-]+$/',
             'name' => 'required|string',
             'category' => 'nullable|string',
+            'price' => 'nullable|integer|min:0',
         ]);
 
         $filename = basename($validated['filename']); // Prevent directory traversal
@@ -933,7 +935,8 @@ class DashboardController extends Controller
                 'name' => $validated['name'],
                 'category' => $validated['category'] ?? null,
                 'template_path' => $validated['key'],
-                'is_active' => true
+                'is_active' => true,
+                'price' => isset($validated['price']) ? (int)$validated['price'] : null,
             ]);
 
             return response()->json([
@@ -1721,6 +1724,27 @@ class DashboardController extends Controller
                 'error' => 'Optimization failed: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Update the price of a template.
+     */
+    public function updatePrice(\Illuminate\Http\Request $request, $id): \Illuminate\Http\JsonResponse
+    {
+        $validated = $request->validate([
+            'price' => 'nullable|integer|min:0',
+        ]);
+
+        $template = ServiceTemplate::findOrFail($id);
+        $template->update([
+            'price' => $validated['price']
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Template price updated successfully.',
+            'template' => $template
+        ]);
     }
 }
 

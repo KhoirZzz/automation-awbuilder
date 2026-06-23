@@ -30,6 +30,7 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::post('/templates', [DashboardController::class, 'storeTemplate']);
     Route::post('/templates/{id}/toggle', [DashboardController::class, 'toggleTemplate']);
     Route::delete('/templates/{id}', [DashboardController::class, 'destroyTemplate']);
+    Route::put('/templates/{id}/price', [DashboardController::class, 'updatePrice']);
     Route::post('/deployments/{id}/teardown', [DashboardController::class, 'teardown']);
     Route::post('/deployments/{id}/extend', [DashboardController::class, 'extend']);
     Route::post('/deployments/{id}/retry', [DashboardController::class, 'retry']);

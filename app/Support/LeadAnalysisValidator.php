@@ -124,6 +124,10 @@ class LeadAnalysisValidator
             }
         }
 
+        if (empty($price) && $serviceTemplate && !empty($serviceTemplate->price)) {
+            $price = (int)$serviceTemplate->price;
+        }
+
         $expiresAt = $durationEnum->calculateExpiry();
 
         return new LeadAnalysisResult(
