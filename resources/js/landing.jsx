@@ -366,7 +366,7 @@ function Landing() {
                                             <div>
                                                 <span className="text-[10px] text-zinc-500 block uppercase">Biaya Layanan</span>
                                                 <span className="text-white font-extrabold text-xs">
-                                                    {selectedTemplate.price ? `Rp ${Number(selectedTemplate.price).toLocaleString('id-ID')}` : 'Gratis / Hubungi Admin'}
+                                                    {selectedTemplate.price ? `Rp ${Number(calculatePriceForDuration(selectedTemplate.price, durasi)).toLocaleString('id-ID')}` : 'Gratis / Hubungi Admin'}
                                                 </span>
                                             </div>
                                             <Button type="submit" variant="primary" loading={loading} className="uppercase font-bold tracking-wider text-xs">
