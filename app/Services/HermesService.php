@@ -20,9 +20,10 @@ class HermesService
      */
     public function analyzeLead(string $message, Collection $activeTemplates): array
     {
-        $apiUrl = config('services.hermes.api_url');
-        $apiKey = config('services.hermes.api_key');
-        $model = config('services.hermes.model');
+        $creds = $this->resolveCredentials();
+        $apiUrl = $creds['url'];
+        $apiKey = $creds['key'];
+        $model = $creds['model'];
 
         $activeServiceKeys = $activeTemplates->pluck('key')->toArray();
         $durationKeys = collect(ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
@@ -161,7 +162,7 @@ You are a helpful assistant that can both process client deployment orders and a
    - Client slug validation: Lowercase, alphanumeric & hyphens only, starts/ends with alphanumeric, max 63 characters (RFC 1035). Spacers, path traversals (..), and reserved subdomains (e.g. admin, api, www, auth) are rejected.
 3. Directory Replication & Script Execution:
    - Copies templates from `storage/templates` to `storage/deployments`.
-   - Injects `.env` config (CLIENT_SLUG, DEPLOY_EXPIRES_AT, DEPLOY_STARTED_AT).
+   - Injets `.env` config (CLIENT_SLUG, DEPLOY_EXPIRES_AT, DEPLOY_STARTED_AT).
    - Runs `deploy.sh` with a 60-second timeout.
    - Transactional rollback: Automatically deletes the client folder and marks database status as `failed` if `deploy.sh` fails.
 4. Lifecycle Audit (Teardown):
@@ -244,9 +245,10 @@ PROMPT;
      */
     public function chat(string $systemPrompt, array|string $messages): string
     {
-        $apiUrl = config('services.hermes.api_url');
-        $apiKey = config('services.hermes.api_key');
-        $model = config('services.hermes.model');
+        $creds = $this->resolveCredentials();
+        $apiUrl = $creds['url'];
+        $apiKey = $creds['key'];
+        $model = $creds['model'];
 
         $headers = [
             'Accept' => 'application/json',
@@ -302,4 +304,92 @@ PROMPT;
 
         return $responseText;
     }
+
+    /**
+     * Get the resolved credentials, URL, and model to use.
+     *
+     * @return array
+     */
+    public function getResolvedCredentials(): array
+    {
+        return $this->resolveCredentials();
+    }
+
+    /**
+     * Resolve the API credentials, URL, and model to use.
+     *
+     * @return array
+     */
+    protected function resolveCredentials(): array
+    {
+        $apiUrl = config('services.hermes.api_url');
+        $apiKey = config('services.hermes.api_key');
+        $model = config('services.hermes.model');
+
+        // Check if Nous Portal auth file exists and is readable
+        $nousAuth = $this->getNousAccessToken();
+        
+        // If we have Nous Auth, and NO explicit API key is set in .env (or it is set to 'NOUS_PORTAL' or the default NVIDIA key),
+        // we automatically use the Nous Portal token and Hermes model.
+        $isDefaultKey = ($apiKey === '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');
+        if ($nousAuth && (empty($apiKey) || $apiKey === 'NOUS_PORTAL' || $isDefaultKey)) {
+            $apiUrl = rtrim($nousAuth['base_url'], '/') . '/chat/completions';
+            $apiKey = $nousAuth['token'];
+            
+            // Switch model to Hermes 4 70B
+            if ($model === 'stepfun-ai/step-3.7-flash' || $model === 'hermes3') {
+                $model = 'nousresearch/hermes-4-70b';
+            }
+        }
+
+        return [
+            'url' => $apiUrl,
+            'key' => $apiKey,
+            'model' => $model,
+        ];
+    }
+
+    /**
+     * Retrieve the active access token and base url from ~/.hermes/auth.json
+     *
+     * @return array|null
+     */
+    protected function getNousAccessToken(): ?array
+    {
+        $path = '/home/awbuilder/.hermes/auth.json';
+        if (!file_exists($path)) {
+            return null;
+        }
+
+        $content = file_get_contents($path);
+        if (!$content) {
+            return null;
+        }
+
+        $data = json_decode($content, true);
+        if (!$data) {
+            return null;
+        }
+
+        $activeProvider = $data['active_provider'] ?? 'nous';
+        $credentials = $data['credential_pool'][$activeProvider] ?? [];
+        if (empty($credentials)) {
+            return null;
+        }
+
+        // Use the first credential
+        $cred = $credentials[0];
+        $token = $cred['access_token'] ?? null;
+        $baseUrl = $cred['inference_base_url'] ?? 'https://inference-api.nousresearch.com/v1';
+
+        if (!$token) {
+            return null;
+        }
+
+        return [
+            'token' => $token,
+            'base_url' => $baseUrl,
+        ];
+    }
 }
+

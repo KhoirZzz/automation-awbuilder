@@ -496,9 +496,10 @@ class DashboardController extends Controller
      */
     public function getAgentConfig(\App\Services\HermesService $hermesService): JsonResponse
     {
-        $apiUrl = config('services.hermes.api_url');
-        $apiKey = config('services.hermes.api_key');
-        $model = config('services.hermes.model');
+        $creds = $hermesService->getResolvedCredentials();
+        $apiUrl = $creds['url'];
+        $apiKey = $creds['key'];
+        $model = $creds['model'];
 
         $activeServiceKeys = ServiceTemplate::where('is_active', true)->pluck('key')->toArray();
         $durationKeys = collect(\App\Enums\ServiceDuration::cases())->map(fn ($case) => $case->value)->toArray();
