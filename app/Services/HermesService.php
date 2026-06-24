@@ -326,6 +326,15 @@ PROMPT;
         $apiKey = config('services.hermes.api_key');
         $model = config('services.hermes.model');
 
+        // Do not override credentials during unit testing so that faked HTTP requests work properly
+        if (app()->runningUnitTests()) {
+            return [
+                'url' => $apiUrl,
+                'key' => $apiKey,
+                'model' => $model,
+            ];
+        }
+
         // Check if Nous Portal auth file exists and is readable
         $nousAuth = $this->getNousAccessToken();
         
