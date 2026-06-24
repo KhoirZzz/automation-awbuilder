@@ -41,7 +41,7 @@ class DeployDemoInstanceJob implements ShouldQueue
      */
     public function handle(DeployServiceAction $deployAction): void
     {
-        $clientSlug = "demo." . $this->template->key;
+        $clientSlug = "demo-" . $this->template->key;
 
         Log::channel('deploy-audit')->info("Processing automated demo deploy job for key: {$this->template->key}");
 

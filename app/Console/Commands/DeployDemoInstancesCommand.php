@@ -27,7 +27,7 @@ class DeployDemoInstancesCommand extends Command
         $this->info("Found " . $templates->count() . " templates.");
 
         foreach ($templates as $template) {
-            $clientSlug = "demo." . $template->key;
+            $clientSlug = "demo-" . $template->key;
             $this->info("Checking demo instance for: {$template->key} (Slug: {$clientSlug})");
 
             if ($this->option('sync')) {

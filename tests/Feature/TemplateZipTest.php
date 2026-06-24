@@ -368,12 +368,12 @@ class TemplateZipTest extends TestCase
         // 4. Verify deployment record created in DB
         $this->assertDatabaseHas('deployments', [
             'service_template_id' => $template->id,
-            'client_slug' => 'demo.test-demo-template',
+            'client_slug' => 'demo-test-demo-template',
             'status' => \App\Enums\DeploymentStatus::ACTIVE->value
         ]);
 
         // Clean up the instance path if created
-        $instancePath = config('deploy.instance_base_path') . '/demo.test-demo-template';
+        $instancePath = config('deploy.instance_base_path') . '/demo-test-demo-template';
         if (File::isDirectory($instancePath)) {
             File::deleteDirectory($instancePath);
         }
