@@ -364,4 +364,115 @@ class SandboxTest extends TestCase
         // Clean up
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
     }
+
+    public function test_download_pdf_by_slug_active(): void
+    {
+        config(['app.url' => 'https://mockbuild.shop']);
+        config(['deploy.instance_base_path' => storage_path('deployments_test')]);
+
+        $instancePath = storage_path('deployments_test/my-active-slug');
+        \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true, true);
+        \Illuminate\Support\Facades\File::put($instancePath . '/shopee-16.pdf', 'dummy pdf content');
+
+        $template = ServiceTemplate::create([
+            'key' => 'gojek-test-3',
+            'name' => 'Gojek Test Template 3',
+            'template_path' => 'gojek',
+            'is_active' => true,
+        ]);
+
+        Deployment::create([
+            'source' => 'telegram',
+            'service_template_id' => $template->id,
+            'lead_reference' => 'test_lead_pdf_active',
+            'client_slug' => 'my-active-slug',
+            'status' => \App\Enums\DeploymentStatus::ACTIVE->value,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+        ]);
+
+        $response = $this->get('https://mockbuild.shop/my-active-slug');
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Disposition', 'attachment; filename=shopee-16.pdf');
+        $this->assertEquals('dummy pdf content', $response->streamedContent());
+
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+    }
+
+    public function test_download_pdf_by_slug_pending(): void
+    {
+        config(['app.url' => 'https://mockbuild.shop']);
+        config(['deploy.instance_base_path' => storage_path('deployments_test')]);
+
+        $instancePath = storage_path('deployments_test/my-pending-slug');
+        \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true, true);
+        \Illuminate\Support\Facades\File::put($instancePath . '/shopee-16.pdf', 'dummy pdf content');
+
+        $template = ServiceTemplate::create([
+            'key' => 'gojek-test-4',
+            'name' => 'Gojek Test Template 4',
+            'template_path' => 'gojek',
+            'is_active' => true,
+        ]);
+
+        $deployment = Deployment::create([
+            'source' => 'telegram',
+            'service_template_id' => $template->id,
+            'lead_reference' => 'test_lead_pdf_pending',
+            'client_slug' => 'my-pending-slug',
+            'status' => \App\Enums\DeploymentStatus::PENDING_PAYMENT->value,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+            'price' => 150000,
+        ]);
+
+        $response = $this->get('https://mockbuild.shop/my-pending-slug');
+        $response->assertStatus(200);
+        $response->assertViewIs('pending_download');
+        $response->assertSee('Persetujuan Tertunda');
+        $response->assertSee('my-pending-slug');
+
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+    }
+
+    public function test_download_pdf_by_slug_with_passkey(): void
+    {
+        config(['app.url' => 'https://mockbuild.shop']);
+        config([
+            'deploy.instance_base_path' => storage_path('deployments_test'),
+            'deploy.agent_passkey' => '051205'
+        ]);
+
+        $instancePath = storage_path('deployments_test/my-admin-slug');
+        \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true, true);
+        \Illuminate\Support\Facades\File::put($instancePath . '/shopee-16.pdf', 'admin dummy pdf content');
+
+        $template = ServiceTemplate::create([
+            'key' => 'gojek-test-5',
+            'name' => 'Gojek Test Template 5',
+            'template_path' => 'gojek',
+            'is_active' => true,
+        ]);
+
+        Deployment::create([
+            'source' => 'telegram',
+            'service_template_id' => $template->id,
+            'lead_reference' => 'test_lead_pdf_admin',
+            'client_slug' => 'my-admin-slug',
+            'status' => \App\Enums\DeploymentStatus::PENDING_PAYMENT->value,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+        ]);
+
+        // Accessing with admin passkey should bypass the active check and allow downloading
+        $response = $this->get('https://mockbuild.shop/my-admin-slug?passkey=051205');
+        $response->assertStatus(200);
+        $response->assertHeader('Content-Disposition', 'attachment; filename=shopee-16.pdf');
+        $this->assertEquals('admin dummy pdf content', $response->streamedContent());
+
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+    }
 }

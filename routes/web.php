@@ -131,7 +131,42 @@ Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
     })->where('any', '(?!api/).*');
 });
 
-// 3. Fallback route: Main domain, WWW, and localhost serves the public landing store page
+// 3. Dynamic PDF download route by slug on the main domain/WWW
+Route::get('/{slug}', function ($slug) {
+    // Look up deployment by slug
+    $deployment = \App\Models\Deployment::where('client_slug', $slug)->first();
+
+    if ($deployment) {
+        $isAdmin = request()->query('passkey') === config('deploy.agent_passkey');
+
+        if ($deployment->status === \App\Enums\DeploymentStatus::ACTIVE || $isAdmin) {
+            $basePath = $deployment->instance_path;
+            
+            // Check for PDF files
+            if (\Illuminate\Support\Facades\File::isDirectory($basePath)) {
+                $pdfs = glob($basePath . "/*.pdf");
+                if (!empty($pdfs)) {
+                    $filePath = $pdfs[0];
+                    if (file_exists($filePath)) {
+                        $mime = \Illuminate\Support\Facades\File::mimeType($filePath);
+                        return response()->download($filePath, basename($filePath), [
+                            'Content-Type' => $mime,
+                        ]);
+                    }
+                }
+            }
+            return abort(404, "Berkas PDF tidak ditemukan di folder instance.");
+        }
+
+        // Return pending status page if not active
+        return response()->view('pending_download', ['deployment' => $deployment]);
+    }
+
+    // Fallback to landing page if not found
+    return view('landing');
+})->where('slug', '^[a-z0-9](-?[a-z0-9])*$');
+
+// 4. Fallback route: Main domain, WWW, and localhost serves the public landing store page
 Route::get('/{any?}', function () {
     return view('landing');
 })->where('any', '(?!api/).*');

@@ -133,6 +133,8 @@ class ProcessManualDeployJob implements ShouldQueue
                 rawLlmResponse: json_encode([
                     'telegram_token' => $this->params['telegram_token'] ?? '',
                     'telegram_chat_id' => $this->params['telegram_chat_id'] ?? '',
+                    'target_url' => $this->params['target_url'] ?? null,
+                    'output_pdf' => $this->params['output_pdf'] ?? null,
                 ])
             );
 

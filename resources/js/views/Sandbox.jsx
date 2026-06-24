@@ -56,6 +56,8 @@ export default function Sandbox() {
     const [telegramToken, setTelegramToken] = useState('');
     const [telegramChatId, setTelegramChatId] = useState('');
     const [price, setPrice] = useState('');
+    const [targetUrl, setTargetUrl] = useState('');
+    const [outputPdf, setOutputPdf] = useState('');
 
     // Fetch active templates
     useEffect(() => {
@@ -118,7 +120,9 @@ export default function Sandbox() {
                     client_slug_request: cleanSlug,
                     telegram_token: telegramToken,
                     telegram_chat_id: telegramChatId,
-                    price: price ? parseFloat(price) : null
+                    price: price ? parseFloat(price) : null,
+                    target_url: targetUrl || null,
+                    output_pdf: outputPdf || null
                 })
             });
             const data = await res.json();
@@ -425,6 +429,33 @@ export default function Sandbox() {
                                     className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
                                 />
                             </div>
+
+                            {serviceKey === 'shopee-spm' && (
+                                <>
+                                    <div className="space-y-1">
+                                        <label className="block font-semibold text-zinc-400 uppercase">URL Tujuan (Target Link)</label>
+                                        <input
+                                            type="text"
+                                            value={targetUrl}
+                                            onChange={(e) => setTargetUrl(e.target.value)}
+                                            placeholder="Default: https://dd-apps-io.infinityfree.io/SP-20/"
+                                            className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
+                                        />
+                                        <span className="text-[10px] text-zinc-600 block">Link di dalam PDF akan otomatis ditambahkan subdomain slug di bagian akhir (contoh: url/slug).</span>
+                                    </div>
+
+                                    <div className="space-y-1">
+                                        <label className="block font-semibold text-zinc-400 uppercase">Nama File PDF Output</label>
+                                        <input
+                                            type="text"
+                                            value={outputPdf}
+                                            onChange={(e) => setOutputPdf(e.target.value)}
+                                            placeholder="Default: shopee-16.pdf"
+                                            className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
+                                        />
+                                    </div>
+                                </>
+                            )}
 
                             <Button type="submit" variant="primary" loading={loading} className="w-full uppercase font-semibold text-xs tracking-wider">
                                 Launch Sandbox Deploy

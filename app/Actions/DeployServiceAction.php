@@ -107,11 +107,20 @@ class DeployServiceAction
                 $envContent = File::get($exampleEnvPath);
             }
 
+            $rawResponseData = json_decode($result->rawLlmResponse, true) ?? [];
+
             $injectedValues = [
                 'CLIENT_SLUG' => $result->clientSlug,
                 'DEPLOY_EXPIRES_AT' => $result->expiresAt->toIso8601String(),
                 'DEPLOY_STARTED_AT' => now()->toIso8601String(),
             ];
+
+            if (!empty($rawResponseData['target_url'])) {
+                $injectedValues['TARGET_URL'] = $rawResponseData['target_url'];
+            }
+            if (!empty($rawResponseData['output_pdf'])) {
+                $injectedValues['OUTPUT_PDF'] = $rawResponseData['output_pdf'];
+            }
 
             foreach ($injectedValues as $key => $val) {
                 if (preg_match("/^{$key}=/m", $envContent)) {

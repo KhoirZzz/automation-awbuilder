@@ -372,6 +372,8 @@ class DashboardController extends Controller
             'telegram_token' => 'required|string',
             'telegram_chat_id' => 'required|string',
             'price' => 'nullable|numeric',
+            'target_url' => 'nullable|string',
+            'output_pdf' => 'nullable|string',
         ]);
 
         $leadRef = 'sandbox_manual_' . time() . '_' . rand(100, 999);
@@ -965,6 +967,8 @@ class DashboardController extends Controller
             'telegram_token' => 'required|string',
             'telegram_chat_id' => 'required|string',
             'price' => 'nullable',
+            'target_url' => 'nullable|string',
+            'output_pdf' => 'nullable|string',
         ]);
 
         $serviceTemplate = ServiceTemplate::where('key', $validated['service_key'])->first();
