@@ -206,11 +206,19 @@ export default function Sandbox() {
     const getStageState = (stageKey) => {
         if (!currentStatus) return 'waiting';
 
+        // 1. Exact matching using structured stages list from API if present
+        if (currentStatus.stages && currentStatus.stages[stageKey]) {
+            const st = currentStatus.stages[stageKey].status;
+            if (st === 'failed') return 'error';
+            if (st === 'active' || st === 'pending_payment' || st === 'completed' || st === 'success') return 'success';
+            return st; // 'pending'
+        }
+
         const { stage, status } = currentStatus;
 
         if (stageKey === 'webhook') return 'success';
 
-        // 1. Exact matching for cache-based high-fidelity stages
+        // 2. Exact matching for cache-based high-fidelity stages (fallback)
         const stageOrder = ['webhook', 'llm_analysis', 'validation', 'replication', 'credential_injection', 'script_execution', 'completed'];
         
         if (stageOrder.includes(stage)) {
@@ -229,7 +237,7 @@ export default function Sandbox() {
                 return 'waiting';
             }
 
-            if (status === 'active' || status === 'completed') {
+            if (status === 'active' || status === 'completed' || status === 'success') {
                 return 'success';
             }
         }
@@ -494,6 +502,17 @@ export default function Sandbox() {
                                                     }`}>
                                                         {stage.desc}
                                                     </span>
+                                                    {currentStatus?.stages?.[stage.key]?.message && (
+                                                        <span className={`text-[10px] font-mono mt-1.5 block italic leading-normal ${
+                                                            currentStatus.stages[stage.key].status === 'failed'
+                                                                ? 'text-red-400 border-l border-red-500/30 pl-2'
+                                                                : currentStatus.stages[stage.key].message.includes('Warning')
+                                                                    ? 'text-amber-400 border-l border-amber-500/30 pl-2'
+                                                                    : 'text-zinc-400 border-l border-zinc-700 pl-2'
+                                                        }`}>
+                                                            → {currentStatus.stages[stage.key].message}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         );

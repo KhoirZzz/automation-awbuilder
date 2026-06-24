@@ -50,18 +50,10 @@ class ProcessManualDeployJob implements ShouldQueue
         ]);
 
         // Start stage: llm_analysis -> success (Skipped for manual)
-        Cache::put("sandbox_status_{$this->leadReference}", [
-            'stage' => 'llm_analysis',
-            'status' => 'success',
-            'message' => 'Manual Deploy input received. LLM Logic Extraction bypassed.'
-        ], 600);
+        \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'llm_analysis', 'success', 'Manual Deploy input received. LLM Logic Extraction bypassed.');
 
         // Start stage: validation
-        Cache::put("sandbox_status_{$this->leadReference}", [
-            'stage' => 'validation',
-            'status' => 'pending',
-            'message' => 'Validating manual input fields against system policies...'
-        ], 600);
+        \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'validation', 'pending', 'Validating manual input fields against system policies...');
 
         try {
             $serviceTemplate = ServiceTemplate::where('key', $this->params['service_key'])->first();
@@ -103,20 +95,12 @@ class ProcessManualDeployJob implements ShouldQueue
                 'error' => $e->getMessage()
             ]);
 
-            Cache::put("sandbox_status_{$this->leadReference}", [
-                'stage' => 'validation',
-                'status' => 'failed',
-                'message' => 'Validation failure: ' . $e->getMessage()
-            ], 600);
+            \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'validation', 'failed', 'Validation failure: ' . $e->getMessage());
             return;
         }
 
         // Set stage validation to success
-        Cache::put("sandbox_status_{$this->leadReference}", [
-            'stage' => 'validation',
-            'status' => 'success',
-            'message' => 'Input validated successfully. Ready for provisioning.'
-        ], 600);
+        \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'validation', 'success', 'Input validated successfully. Ready for provisioning.');
 
         try {
             $price = !empty($this->params['price']) ? (int)$this->params['price'] : null;

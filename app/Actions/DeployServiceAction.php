@@ -54,11 +54,7 @@ class DeployServiceAction
         ]);
 
         // Start stage: replication
-        Cache::put("sandbox_status_{$result->leadReference}", [
-            'stage' => 'replication',
-            'status' => 'pending',
-            'message' => 'Cloning template directory and injecting configuration files...'
-        ], 600);
+        self::updateStatus($result->leadReference, 'replication', 'pending', 'Cloning template directory and setting up instance path...');
 
         try {
             // Check if this is a blank/empty template (start from scratch)
@@ -149,11 +145,7 @@ class DeployServiceAction
 
             if ($telegramToken || $telegramChatId) {
                 // Start stage: credential_injection
-                Cache::put("sandbox_status_{$result->leadReference}", [
-                    'stage' => 'credential_injection',
-                    'status' => 'pending',
-                    'message' => 'Searching and injecting Telegram Bot Token and Chat ID into instance code files...'
-                ], 600);
+                self::updateStatus($result->leadReference, 'credential_injection', 'pending', 'Searching and injecting Telegram Bot Token and Chat ID into instance code files...');
 
                 $modifiedFiles = [];
 
@@ -216,21 +208,14 @@ class DeployServiceAction
                 if (empty($modifiedFiles)) {
                     $msg = 'Warning: Telegram Bot Token or Chat ID was provided, but no placeholder tokens/keys were found or modified in the template files.';
                     Log::channel('deploy-audit')->warning($msg);
-                    Cache::put("sandbox_status_{$result->leadReference}", [
-                        'stage' => 'credential_injection',
-                        'status' => 'pending',
-                        'message' => $msg
-                    ], 600);
+                    self::updateStatus($result->leadReference, 'credential_injection', 'success', $msg);
                 } else {
                     $msg = 'Successfully injected credentials into: ' . implode(', ', $modifiedFiles);
-                    Cache::put("sandbox_status_{$result->leadReference}", [
-                        'stage' => 'credential_injection',
-                        'status' => 'success',
-                        'message' => $msg
-                    ], 600);
+                    self::updateStatus($result->leadReference, 'credential_injection', 'success', $msg);
                 }
             } else {
                 Log::channel('deploy-audit')->info('No Telegram credentials provided. Skipping credential injection.');
+                self::updateStatus($result->leadReference, 'credential_injection', 'success', 'No Telegram credentials provided. Skipping credential replacement.');
             }
 
             // 4. Execute deploy.sh (optional)
@@ -242,11 +227,7 @@ class DeployServiceAction
                 ]);
 
                 // Start stage: script_execution
-                Cache::put("sandbox_status_{$result->leadReference}", [
-                    'stage' => 'script_execution',
-                    'status' => 'pending',
-                    'message' => 'Running post-cloning deploy.sh configuration script...'
-                ], 600);
+                self::updateStatus($result->leadReference, 'script_execution', 'pending', 'Running post-cloning deploy.sh configuration script...');
 
                 // Execute using process with array format and template configurable timeout
                 $timeout = $serviceTemplate->timeout ?: 60;
@@ -276,6 +257,7 @@ class DeployServiceAction
                 }
             } else {
                 Log::channel('deploy-audit')->info('No deploy.sh script found in cloned template. Skipping script execution.');
+                self::updateStatus($result->leadReference, 'script_execution', 'success', 'No deploy.sh script found. Skipping script execution.');
             }
 
             // 5. Success finalization
@@ -295,11 +277,7 @@ class DeployServiceAction
                 ? 'Deployment built successfully. Awaiting payment confirmation.'
                 : 'Deployment active and running successfully.';
 
-            Cache::put("sandbox_status_{$result->leadReference}", [
-                'stage' => 'completed',
-                'status' => $finalStatus->value,
-                'message' => $cacheMessage
-            ], 600);
+            self::updateStatus($result->leadReference, 'completed', $finalStatus->value, $cacheMessage);
 
             return $deployment;
 
@@ -327,11 +305,7 @@ class DeployServiceAction
             if (isset($scriptPath) && File::exists($scriptPath)) {
                 $failedStage = 'script_execution';
             }
-            Cache::put("sandbox_status_{$result->leadReference}", [
-                'stage' => $failedStage,
-                'status' => 'failed',
-                'message' => 'Deployment failed: ' . $e->getMessage()
-            ], 600);
+            self::updateStatus($result->leadReference, $failedStage, 'failed', 'Deployment failed: ' . $e->getMessage());
 
             throw $e;
         }
@@ -360,5 +334,32 @@ class DeployServiceAction
         } catch (\Throwable $e) {
             // Silence permission errors
         }
+    }
+
+    /**
+     * Update sandbox stage status with historical trace logic.
+     */
+    public static function updateStatus(string $leadReference, string $stage, string $status, string $message): void
+    {
+        $cacheKey = "sandbox_status_{$leadReference}";
+        $data = Cache::get($cacheKey);
+        if (!is_array($data)) {
+            $data = [
+                'stage' => $stage,
+                'status' => $status,
+                'message' => $message,
+                'stages' => []
+            ];
+        }
+
+        $data['stage'] = $stage;
+        $data['status'] = $status;
+        $data['message'] = $message;
+        $data['stages'][$stage] = [
+            'status' => $status,
+            'message' => $message
+        ];
+
+        Cache::put($cacheKey, $data, 600);
     }
 }

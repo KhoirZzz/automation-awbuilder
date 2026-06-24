@@ -425,11 +425,7 @@ class DashboardController extends Controller
         $leadRef = 'sandbox_manual_' . time() . '_' . rand(100, 999);
 
         // Pre-initialize cache for polling feedback
-        \Illuminate\Support\Facades\Cache::put("sandbox_status_{$leadRef}", [
-            'stage' => 'webhook',
-            'status' => 'success',
-            'message' => 'Manual Deploy request received.'
-        ], 600);
+        \App\Actions\DeployServiceAction::updateStatus($leadRef, 'webhook', 'success', 'Manual Deploy request received.');
 
         \App\Jobs\ProcessManualDeployJob::dispatch($validated, $leadRef);
 
@@ -445,32 +441,44 @@ class DashboardController extends Controller
         $deployment = Deployment::where('lead_reference', $leadReference)->first();
         $cachedStatus = \Illuminate\Support\Facades\Cache::get("sandbox_status_{$leadReference}");
 
+        if ($cachedStatus) {
+            return response()->json(array_merge($cachedStatus, [
+                'deployment' => $deployment
+            ]));
+        }
+
         if ($deployment) {
             if ($deployment->status === DeploymentStatus::ACTIVE) {
                 return response()->json([
                     'stage' => 'completed',
                     'status' => 'active',
                     'message' => 'Deployment active and running successfully.',
-                    'deployment' => $deployment
+                    'deployment' => $deployment,
+                    'stages' => [
+                        'completed' => [
+                            'status' => 'success',
+                            'message' => 'Deployment active and running successfully.'
+                        ]
+                    ]
                 ]);
             }
 
             if ($deployment->status === DeploymentStatus::FAILED) {
-                if ($cachedStatus && $cachedStatus['status'] === 'failed') {
-                    return response()->json(array_merge($cachedStatus, ['deployment' => $deployment]));
-                }
                 return response()->json([
                     'stage' => 'completed',
                     'status' => 'failed',
                     'message' => 'Deployment script execution failed and folder has been rolled back.',
-                    'deployment' => $deployment
+                    'deployment' => $deployment,
+                    'stages' => [
+                        'completed' => [
+                            'status' => 'failed',
+                            'message' => 'Deployment script execution failed.'
+                        ]
+                    ]
                 ]);
             }
 
             if ($deployment->status === DeploymentStatus::PENDING) {
-                if ($cachedStatus) {
-                    return response()->json(array_merge($cachedStatus, ['deployment' => $deployment]));
-                }
                 return response()->json([
                     'stage' => 'deploying',
                     'status' => 'pending',
@@ -478,10 +486,6 @@ class DashboardController extends Controller
                     'deployment' => $deployment
                 ]);
             }
-        }
-
-        if ($cachedStatus) {
-            return response()->json($cachedStatus);
         }
 
         return response()->json([

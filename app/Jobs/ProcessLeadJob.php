@@ -63,11 +63,7 @@ class ProcessLeadJob implements ShouldQueue
         }
 
         // Start stage: llm_analysis
-        Cache::put("sandbox_status_{$this->leadReference}", [
-            'stage' => 'llm_analysis',
-            'status' => 'pending',
-            'message' => 'Hermes is analyzing the lead chat text...'
-        ], 600);
+        \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'llm_analysis', 'pending', 'Hermes is analyzing the lead chat text...');
 
         // Get all active templates
         $activeTemplates = ServiceTemplate::where('is_active', true)->get();
@@ -75,6 +71,7 @@ class ProcessLeadJob implements ShouldQueue
         try {
             // Call Hermes to analyze the lead text
             $rawAnalysis = $hermesService->analyzeLead($this->messageText, $activeTemplates);
+            \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'llm_analysis', 'success', 'Hermes parsed the lead text successfully.');
         } catch (HermesResponseException $e) {
             // Transient error (failed to connect, non-200 code, json decode failure)
             Log::channel('deploy-audit')->error('Transient Hermes error during analysis. Job will retry.', [
@@ -82,26 +79,19 @@ class ProcessLeadJob implements ShouldQueue
                 'error' => $e->getMessage()
             ]);
 
-            Cache::put("sandbox_status_{$this->leadReference}", [
-                'stage' => 'llm_analysis',
-                'status' => 'failed',
-                'message' => 'Transient Hermes connection failed: ' . $e->getMessage()
-            ], 600);
+            \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'llm_analysis', 'failed', 'Transient Hermes connection failed: ' . $e->getMessage());
 
             // Re-throw so Laravel's queue manager retries the job
             throw $e;
         }
 
         // Start stage: validation
-        Cache::put("sandbox_status_{$this->leadReference}", [
-            'stage' => 'validation',
-            'status' => 'pending',
-            'message' => 'Validating extracted metadata against system policies...'
-        ], 600);
+        \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'validation', 'pending', 'Validating extracted metadata against system policies...');
 
         try {
             // Validate the raw result from Hermes
             $analysisResult = $validator->validate($rawAnalysis, $this->source, $this->leadReference);
+            \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'validation', 'success', 'Extracted metadata validated successfully.');
         } catch (InvalidLeadAnalysisException $e) {
             // Non-transient validation failure (not matching whitelist, reserved word, invalid slug format)
             // Logged as warning in validator, job finishes successfully here to prevent retries.
@@ -110,11 +100,7 @@ class ProcessLeadJob implements ShouldQueue
                 'message' => $e->getMessage()
             ]);
 
-            Cache::put("sandbox_status_{$this->leadReference}", [
-                'stage' => 'validation',
-                'status' => 'failed',
-                'message' => 'Lead rejected due to validation failure: ' . $e->getMessage()
-            ], 600);
+            \App\Actions\DeployServiceAction::updateStatus($this->leadReference, 'validation', 'failed', 'Lead rejected due to validation failure: ' . $e->getMessage());
 
             if ($chatId) {
                 $botService->sendMessage($chatId, "❌ <b>Pemesanan Gagal</b>\n\nMaaf, pesanan Anda tidak dapat diproses karena kesalahan berikut:\n<i>" . $e->getMessage() . "</i>");
