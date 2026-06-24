@@ -97,4 +97,107 @@ class DashboardDeploymentTest extends TestCase
         ]);
         $this->assertDatabaseMissing('deployments', ['id' => $deployment->id]);
     }
+
+    public function test_teardown_active_deployment_success(): void
+    {
+        // Mock base paths
+        config([
+            'deploy.instance_base_path' => storage_path('deployments_test'),
+            'deploy.archive_path' => storage_path('deployments_archive_test')
+        ]);
+
+        $instancePath = storage_path('deployments_test/active-slug');
+        \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true, true);
+        \Illuminate\Support\Facades\File::put($instancePath . '/teardown.sh', "#!/bin/bash\necho 'teardown'\n");
+        @chmod($instancePath . '/teardown.sh', 0755);
+
+        $deployment = Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => 'tg_test_teardown_active',
+            'service_template_id' => $this->template->id,
+            'client_slug' => 'active-slug',
+            'status' => DeploymentStatus::ACTIVE,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+        ]);
+
+        $response = $this->postJson("/api/dashboard/deployments/{$deployment->id}/teardown", [], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'message' => 'Deployment torn down and archived.'
+        ]);
+
+        $this->assertEquals(DeploymentStatus::EXPIRED, $deployment->fresh()->status);
+        $this->assertDirectoryDoesNotExist($instancePath);
+
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_archive_test'));
+    }
+
+    public function test_teardown_pending_payment_deployment_success(): void
+    {
+        // Mock base paths
+        config([
+            'deploy.instance_base_path' => storage_path('deployments_test'),
+            'deploy.archive_path' => storage_path('deployments_archive_test')
+        ]);
+
+        $instancePath = storage_path('deployments_test/pending-payment-slug');
+        \Illuminate\Support\Facades\File::makeDirectory($instancePath, 0755, true, true);
+
+        $deployment = Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => 'tg_test_teardown_pending',
+            'service_template_id' => $this->template->id,
+            'client_slug' => 'pending-payment-slug',
+            'status' => DeploymentStatus::PENDING_PAYMENT,
+            'instance_path' => $instancePath,
+            'started_at' => now(),
+            'expires_at' => now()->addWeek(),
+        ]);
+
+        $response = $this->postJson("/api/dashboard/deployments/{$deployment->id}/teardown", [], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(200);
+        $response->assertJson([
+            'success' => true,
+            'message' => 'Deployment torn down and archived.'
+        ]);
+
+        $this->assertEquals(DeploymentStatus::EXPIRED, $deployment->fresh()->status);
+        $this->assertDirectoryDoesNotExist($instancePath);
+
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_test'));
+        \Illuminate\Support\Facades\File::deleteDirectory(storage_path('deployments_archive_test'));
+    }
+
+    public function test_teardown_fails_for_expired_deployment(): void
+    {
+        $deployment = Deployment::create([
+            'source' => 'telegram',
+            'lead_reference' => 'tg_test_teardown_expired',
+            'service_template_id' => $this->template->id,
+            'client_slug' => 'expired-slug',
+            'status' => DeploymentStatus::EXPIRED,
+            'instance_path' => storage_path('deployments/expired-slug'),
+            'started_at' => now(),
+            'expires_at' => now()->subDay(),
+        ]);
+
+        $response = $this->postJson("/api/dashboard/deployments/{$deployment->id}/teardown", [], [
+            'X-Admin-Passkey' => '852963'
+        ]);
+
+        $response->assertStatus(400);
+        $response->assertJson([
+            'error' => 'Only active or pending payment deployments can be torn down.'
+        ]);
+    }
 }

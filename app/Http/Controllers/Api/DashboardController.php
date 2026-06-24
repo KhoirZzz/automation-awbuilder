@@ -14,6 +14,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Process;
 use Carbon\Carbon;
+use Illuminate\Support\Facades\Log;
 
 class DashboardController extends Controller
 {
@@ -154,8 +155,8 @@ class DashboardController extends Controller
     {
         $deployment = Deployment::findOrFail($id);
 
-        if ($deployment->status !== DeploymentStatus::ACTIVE) {
-            return response()->json(['error' => 'Only active deployments can be torn down.'], 400);
+        if (!in_array($deployment->status, [DeploymentStatus::ACTIVE, DeploymentStatus::PENDING_PAYMENT])) {
+            return response()->json(['error' => 'Only active or pending payment deployments can be torn down.'], 400);
         }
 
         $instancePath = $deployment->instance_path;
