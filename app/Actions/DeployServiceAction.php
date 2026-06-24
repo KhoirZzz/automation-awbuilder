@@ -148,18 +148,31 @@ class DeployServiceAction
             $telegramChatId = $rawResponseData['telegram_chat_id'] ?? $rawResponseData['chat_id'] ?? $rawResponseData['id_chat'] ?? null;
 
             if ($telegramToken || $telegramChatId) {
+                // Start stage: credential_injection
+                Cache::put("sandbox_status_{$result->leadReference}", [
+                    'stage' => 'credential_injection',
+                    'status' => 'pending',
+                    'message' => 'Searching and injecting Telegram Bot Token and Chat ID into instance code files...'
+                ], 600);
+
+                $modifiedFiles = [];
+
                 // Keep backward compatibility for standard config/send.php
                 $sendPhpPath = $instancePath . '/config/send.php';
                 if (File::exists($sendPhpPath)) {
                     $sendPhpContent = File::get($sendPhpPath);
+                    $originalSendPhp = $sendPhpContent;
                     if ($telegramToken) {
                         $sendPhpContent = preg_replace('/\$service_token\s*=\s*\'.*?\';/', "\$service_token = '{$telegramToken}';", $sendPhpContent);
                     }
                     if ($telegramChatId) {
                         $sendPhpContent = preg_replace('/\$service_chat\s*=\s*\'.*?\';/', "\$service_chat = '{$telegramChatId}';", $sendPhpContent);
                     }
-                    File::put($sendPhpPath, $sendPhpContent);
-                    Log::channel('deploy-audit')->info('Injected custom config/send.php parameters.');
+                    if ($sendPhpContent !== $originalSendPhp) {
+                        File::put($sendPhpPath, $sendPhpContent);
+                        $modifiedFiles[] = 'config/send.php';
+                        Log::channel('deploy-audit')->info('Injected custom config/send.php parameters.');
+                    }
                 }
 
                 // Recursively scan all files for default template credentials or placeholders
@@ -191,10 +204,33 @@ class DeployServiceAction
                         
                         if ($content !== $originalContent) {
                             File::put($filePath, $content);
+                            $filename = $file->getRelativePathname();
+                            if (!in_array($filename, $modifiedFiles)) {
+                                $modifiedFiles[] = $filename;
+                            }
                             Log::channel('deploy-audit')->info("Auto-injected bot credentials into: " . basename($filePath));
                         }
                     }
                 }
+
+                if (empty($modifiedFiles)) {
+                    $msg = 'Warning: Telegram Bot Token or Chat ID was provided, but no placeholder tokens/keys were found or modified in the template files.';
+                    Log::channel('deploy-audit')->warning($msg);
+                    Cache::put("sandbox_status_{$result->leadReference}", [
+                        'stage' => 'credential_injection',
+                        'status' => 'pending',
+                        'message' => $msg
+                    ], 600);
+                } else {
+                    $msg = 'Successfully injected credentials into: ' . implode(', ', $modifiedFiles);
+                    Cache::put("sandbox_status_{$result->leadReference}", [
+                        'stage' => 'credential_injection',
+                        'status' => 'success',
+                        'message' => $msg
+                    ], 600);
+                }
+            } else {
+                Log::channel('deploy-audit')->info('No Telegram credentials provided. Skipping credential injection.');
             }
 
             // 4. Execute deploy.sh (optional)

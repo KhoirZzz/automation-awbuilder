@@ -8,8 +8,9 @@ const STAGES = [
     { key: 'llm_analysis', label: '2. LLM Logic Extraction', desc: 'Hermes model extracts key details (service, duration, client slug).' },
     { key: 'validation', label: '3. Policy & Whitelist Validation', desc: 'Sanitizing slug rules, DNS compliance, blacklist check, and duplicate check.' },
     { key: 'replication', label: '4. Instance Directory Provisioning', desc: 'Cloning relative template paths and injecting local environment configs.' },
-    { key: 'script_execution', label: '5. deploy.sh Execution', desc: 'Running local post-cloning setup script inside instance.' },
-    { key: 'completed', label: '6. Instance Deployment Live', desc: 'Deployment record committed as active in database.' }
+    { key: 'credential_injection', label: '5. Credential Replacement', desc: 'Searching and injecting Telegram Bot Token and Chat ID into instance code files.' },
+    { key: 'script_execution', label: '6. deploy.sh Execution', desc: 'Running local post-cloning setup script inside instance.' },
+    { key: 'completed', label: '7. Instance Deployment Live', desc: 'Deployment record committed as active in database.' }
 ];
 
 function calculatePriceForDuration(basePrice, duration) {
@@ -210,7 +211,7 @@ export default function Sandbox() {
         if (stageKey === 'webhook') return 'success';
 
         // 1. Exact matching for cache-based high-fidelity stages
-        const stageOrder = ['webhook', 'llm_analysis', 'validation', 'replication', 'script_execution', 'completed'];
+        const stageOrder = ['webhook', 'llm_analysis', 'validation', 'replication', 'credential_injection', 'script_execution', 'completed'];
         
         if (stageOrder.includes(stage)) {
             const currentStageIndex = stageOrder.indexOf(stage);
