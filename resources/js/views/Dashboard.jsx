@@ -450,8 +450,8 @@ export default function Dashboard({ onTriggerAgentEdit }) {
         return `${diffDays}d remaining`;
     };
 
-    const demoDeployments = deployments.filter(dep => dep.client_slug && dep.client_slug.startsWith('demo.'));
-    const productionDeployments = deployments.filter(dep => !dep.client_slug || !dep.client_slug.startsWith('demo.'));
+    const demoDeployments = deployments.filter(dep => dep.client_slug && dep.client_slug.startsWith('demo-'));
+    const productionDeployments = deployments.filter(dep => !dep.client_slug || !dep.client_slug.startsWith('demo-'));
 
     const renderDeploymentsTable = (list, sectionTitle) => {
         return (
