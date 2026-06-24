@@ -160,6 +160,11 @@ class DashboardController extends Controller
 
         $instancePath = $deployment->instance_path;
 
+        Log::channel('deploy-audit')->info('Manual teardown triggered.', [
+            'deployment_id' => $deployment->id,
+            'client_slug' => $deployment->client_slug
+        ]);
+
         try {
             if (File::isDirectory($instancePath)) {
                 $teardownScript = $instancePath . '/teardown.sh';
@@ -169,12 +174,21 @@ class DashboardController extends Controller
                         ->run(['bash', 'teardown.sh', $deployment->client_slug]);
 
                     if (!$processResult->successful()) {
+                        Log::channel('deploy-audit')->error('Manual teardown script failed.', [
+                            'deployment_id' => $deployment->id,
+                            'exit_code' => $processResult->exitCode(),
+                            'stdout' => $processResult->output(),
+                            'stderr' => $processResult->errorOutput()
+                        ]);
                         return response()->json([
                             'error' => 'teardown.sh script failed.',
                             'stdout' => $processResult->output(),
                             'stderr' => $processResult->errorOutput()
                         ], 500);
                     }
+                    Log::channel('deploy-audit')->info('Manual teardown script completed successfully.', [
+                        'deployment_id' => $deployment->id
+                    ]);
                 }
 
                 // Move to archive folder
@@ -188,8 +202,17 @@ class DashboardController extends Controller
 
             $deployment->update(['status' => DeploymentStatus::EXPIRED]);
 
+            Log::channel('deploy-audit')->info('Manual teardown completed successfully.', [
+                'deployment_id' => $deployment->id,
+                'client_slug' => $deployment->client_slug
+            ]);
+
             return response()->json(['success' => true, 'message' => 'Deployment torn down and archived.']);
         } catch (\Exception $e) {
+            Log::channel('deploy-audit')->error('Manual teardown failed with exception.', [
+                'deployment_id' => $deployment->id,
+                'error' => $e->getMessage()
+            ]);
             return response()->json(['error' => $e->getMessage()], 500);
         }
     }
@@ -215,7 +238,7 @@ class DashboardController extends Controller
         }
 
         // Calculate new expiry date from current expires_at
-        $currentExpiry = Carbon::parse($deployment->expires_at);
+        $currentExpiry = \Carbon\Carbon::parse($deployment->expires_at);
         $newExpiry = match ($durationEnum) {
             ServiceDuration::ONE_WEEK => $currentExpiry->addWeek(),
             ServiceDuration::ONE_MONTH => $currentExpiry->addMonth(),
@@ -224,7 +247,30 @@ class DashboardController extends Controller
             ServiceDuration::ONE_YEAR => $currentExpiry->addYear(),
         };
 
-        $deployment->update(['expires_at' => $newExpiry]);
+        $deployment->update([
+            'expires_at' => $newExpiry,
+            'reminder_3_days_sent' => false,
+            'reminder_1_day_sent' => false,
+        ]);
+
+        // Update physical .env file in instance_path
+        $envPath = $deployment->instance_path . '/.env';
+        if (\Illuminate\Support\Facades\File::exists($envPath)) {
+            $envContent = \Illuminate\Support\Facades\File::get($envPath);
+            $val = $newExpiry->toIso8601String();
+            if (preg_match('/^DEPLOY_EXPIRES_AT=/m', $envContent)) {
+                $envContent = preg_replace('/^DEPLOY_EXPIRES_AT=.*/m', "DEPLOY_EXPIRES_AT={$val}", $envContent);
+            } else {
+                $envContent .= "\nDEPLOY_EXPIRES_AT={$val}";
+            }
+            \Illuminate\Support\Facades\File::put($envPath, trim($envContent) . "\n");
+        }
+
+        Log::channel('deploy-audit')->info('Deployment manually extended.', [
+            'deployment_id' => $deployment->id,
+            'client_slug' => $deployment->client_slug,
+            'new_expires_at' => $newExpiry->toIso8601String()
+        ]);
 
         return response()->json([
             'success' => true,

@@ -120,6 +120,7 @@ You must respond ONLY with a raw JSON object containing these keys:
 4. "telegram_token": (string|null) Extract any Telegram Bot Token present in the user request (format: digits:alphanumeric). If not present, return null.
 5. "telegram_chat_id": (string|null) Extract any Telegram Chat ID or Group ID present in the user request. If not present, return null.
 6. "price": (integer|string|null) Extract the price mentioned in the request (e.g. 100k -> 100000, 1.5jt -> 1500000, 150000 -> 150000). If not present, return null.
+7. "custom_domain": (string|null) Extract any custom domain (e.g., domain.com, sub.domain.com) specified in the user request. Do not confuse this with client_slug_request. If not present, return null.
 
 Do not include any chat formatting, markdown block styling (like ```json), commentary, or extra whitespace.
 
@@ -130,7 +131,8 @@ Example Output:
   "client_slug_request": "tokoabc",
   "telegram_token": "8820475519:AAEGwriFkJA1k8Q2faZw_gRKNiUBxJJw4tY",
   "telegram_chat_id": "8752387283",
-  "price": 100000
+  "price": 100000,
+  "custom_domain": "tokoabc.my.id"
 }
 PROMPT;
     }

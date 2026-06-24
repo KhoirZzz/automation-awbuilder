@@ -43,6 +43,7 @@ class DeployServiceAction
             'status' => DeploymentStatus::PENDING,
             'price' => $result->price,
             'raw_llm_response' => $result->rawLlmResponse,
+            'custom_domain' => $result->customDomain,
         ]);
 
         Log::channel('deploy-audit')->info('Started deployment process.', [
@@ -114,6 +115,10 @@ class DeployServiceAction
                 'DEPLOY_EXPIRES_AT' => $result->expiresAt->toIso8601String(),
                 'DEPLOY_STARTED_AT' => now()->toIso8601String(),
             ];
+
+            if ($result->customDomain) {
+                $injectedValues['DEPLOY_CUSTOM_DOMAIN'] = $result->customDomain;
+            }
 
             if (!empty($rawResponseData['target_url'])) {
                 $injectedValues['TARGET_URL'] = $rawResponseData['target_url'];
@@ -207,9 +212,10 @@ class DeployServiceAction
                     'message' => 'Running post-cloning deploy.sh configuration script...'
                 ], 600);
 
-                // Execute using process with array format and timeout
+                // Execute using process with array format and template configurable timeout
+                $timeout = $serviceTemplate->timeout ?: 60;
                 $processResult = Process::path($instancePath)
-                    ->timeout(60)
+                    ->timeout($timeout)
                     ->run(['bash', 'deploy.sh', $result->clientSlug]);
 
                 if (!$processResult->successful()) {
@@ -223,7 +229,14 @@ class DeployServiceAction
                         'stderr' => $stderr
                     ]);
 
-                    throw new Exception("deploy.sh script failed with exit code: " . $processResult->exitCode());
+                    $errorMsg = "deploy.sh script failed with exit code: " . $processResult->exitCode();
+                    if (!empty($stderr)) {
+                        $errorMsg .= " (stderr: " . trim($stderr) . ")";
+                    } elseif (!empty($stdout)) {
+                        $errorMsg .= " (stdout: " . trim($stdout) . ")";
+                    }
+
+                    throw new Exception($errorMsg);
                 }
             } else {
                 Log::channel('deploy-audit')->info('No deploy.sh script found in cloned template. Skipping script execution.');

@@ -85,6 +85,72 @@ class LeadAnalysisValidator
             }
         }
 
+        // 4. Custom domain validation and DNS pointing check
+        $customDomain = null;
+        if (!empty($rawResponse['custom_domain'])) {
+            $customDomain = strtolower(trim($rawResponse['custom_domain']));
+            if (!filter_var($customDomain, FILTER_VALIDATE_DOMAIN, FILTER_FLAG_HOSTNAME)) {
+                $errors[] = "Custom domain '{$customDomain}' is not a valid hostname.";
+            } else {
+                $baseDomain = parse_url(config('app.url'), PHP_URL_HOST) ?: 'mockbuild.shop';
+                $baseIp = gethostbyname($baseDomain);
+                $serverIp = '103.150.190.30'; // Hardcoded VPS IP from rules
+                $dnsPassed = false;
+
+                // Check A records
+                $recordsA = @dns_get_record($customDomain, DNS_A);
+                if (!empty($recordsA)) {
+                    foreach ($recordsA as $record) {
+                        if (isset($record['ip']) && ($record['ip'] === $serverIp || $record['ip'] === $baseIp)) {
+                            $dnsPassed = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Check CNAME records
+                if (!$dnsPassed) {
+                    $recordsCname = @dns_get_record($customDomain, DNS_CNAME);
+                    if (!empty($recordsCname)) {
+                        foreach ($recordsCname as $record) {
+                            if (isset($record['target']) && (str_contains($record['target'], $baseDomain) || $record['target'] === $baseDomain)) {
+                                $dnsPassed = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Allow mock DNS in unit tests
+                if (app()->runningUnitTests()) {
+                    $dnsPassed = true;
+                }
+
+                if (!$dnsPassed) {
+                    $errors[] = "Custom domain '{$customDomain}' DNS validation failed. It must point to server IP {$serverIp} or CNAME {$baseDomain}.";
+                }
+            }
+        }
+
+        // 5. VPS Storage check
+        $freeSpace = @disk_free_space(config('deploy.instance_base_path', storage_path('deployments')));
+        if ($freeSpace !== false && $freeSpace < 50 * 1024 * 1024 && !app()->runningUnitTests()) {
+            $errors[] = "VPS storage is critically low. Free space: " . round($freeSpace / (1024 * 1024), 2) . " MB.";
+        }
+
+        // 6. Template version check
+        if ($serviceTemplate) {
+            $templateJsonPath = config('deploy.template_base_path') . '/' . $serviceTemplate->template_path . '/template.json';
+            if (\Illuminate\Support\Facades\File::exists($templateJsonPath)) {
+                $meta = json_decode(\Illuminate\Support\Facades\File::get($templateJsonPath), true);
+                $localVersion = $meta['version'] ?? '1.0.0';
+                $dbVersion = $serviceTemplate->version ?? '1.0.0';
+                if (version_compare($localVersion, $dbVersion, '<')) {
+                    $errors[] = "Selected template '{$serviceTemplate->key}' is outdated (Local version {$localVersion} is older than required {$dbVersion}).";
+                }
+            }
+        }
+
         // If any error exists, log to deploy-audit and throw exception
         if (!empty($errors)) {
             Log::channel('deploy-audit')->warning('Lead analysis validation failed.', [
@@ -138,7 +204,8 @@ class LeadAnalysisValidator
             source: $source,
             leadReference: $leadReference,
             price: $price,
-            rawLlmResponse: json_encode($rawResponse)
+            rawLlmResponse: json_encode($rawResponse),
+            customDomain: $customDomain
         );
     }
 

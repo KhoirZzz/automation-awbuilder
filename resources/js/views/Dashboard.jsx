@@ -470,12 +470,12 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                         <span className="font-sans font-bold text-zinc-200 block text-sm">{dep.client_slug}</span>
                                         {dep.status === 'active' && (
                                             <a 
-                                                href={getDeploymentUrl(dep.client_slug)} 
+                                                href={dep.custom_domain ? `http://${dep.custom_domain}` : getDeploymentUrl(dep.client_slug)} 
                                                 target="_blank" 
                                                 rel="noopener noreferrer"
                                                 className="text-[10px] text-zinc-400 hover:text-white font-mono flex items-center gap-0.5 mt-0.5 underline decoration-zinc-700 hover:decoration-zinc-400"
                                             >
-                                                {dep.client_slug}.mockbuild.shop
+                                                {dep.custom_domain ? dep.custom_domain : `${dep.client_slug}.${window.location.hostname.replace(/^(admin|dashboard|www|api)\./i, '')}`}
                                                 <svg className="w-2.5 h-2.5 text-zinc-500 inline" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                                     <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                                                 </svg>
@@ -501,10 +501,26 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                         <span className="text-white font-bold">{dep.price ? `IDR ${dep.price.toLocaleString('id-ID')}` : '-'}</span>
                                     </div>
                                     {dep.status === 'active' && (
-                                        <div className="col-span-2 mt-1">
-                                            <span className="text-zinc-600 block uppercase text-[8px]">Expirations</span>
-                                            <span className="text-zinc-300 font-semibold">{new Date(dep.expires_at).toLocaleDateString()} ({formatRemainingTime(dep.expires_at)})</span>
-                                        </div>
+                                        <>
+                                            <div className="col-span-3 mt-1">
+                                                <span className="text-zinc-650 block uppercase text-[8px]">Expirations</span>
+                                                <span className="text-zinc-300 font-semibold">{new Date(dep.expires_at).toLocaleDateString()} ({formatRemainingTime(dep.expires_at)})</span>
+                                            </div>
+                                            <div className="col-span-3 mt-2 grid grid-cols-3 border-t border-zinc-900/60 pt-2 gap-1 text-[10px]">
+                                                <div>
+                                                    <span className="text-zinc-600 block text-[8px] uppercase">CPU</span>
+                                                    <span className="text-zinc-300 font-semibold">{dep.cpu_usage ?? 0.0}%</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-zinc-650 block text-[8px] uppercase">RAM</span>
+                                                    <span className="text-zinc-300 font-semibold">{dep.ram_usage ?? 0.0} MB</span>
+                                                </div>
+                                                <div>
+                                                    <span className="text-zinc-650 block text-[8px] uppercase">Disk</span>
+                                                    <span className="text-zinc-300 font-semibold">{dep.disk_usage ?? 0.0} MB</span>
+                                                </div>
+                                            </div>
+                                        </>
                                     )}
                                 </div>
                                 <div className="flex flex-wrap gap-2 pt-2 border-t border-zinc-900 justify-end w-full">
@@ -620,6 +636,7 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                 <th className="px-6 py-4">Channel</th>
                                 <th className="px-6 py-4">Harga</th>
                                 <th className="px-6 py-4">Status</th>
+                                <th className="px-6 py-4">Resources</th>
                                 <th className="px-6 py-4">Expirations</th>
                                 <th className="px-6 py-4 text-right">Actions</th>
                             </tr>
@@ -638,12 +655,12 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                             <span className="font-bold text-zinc-200 block">{dep.client_slug}</span>
                                             {dep.status === 'active' && (
                                                 <a 
-                                                    href={getDeploymentUrl(dep.client_slug)} 
+                                                    href={dep.custom_domain ? `http://${dep.custom_domain}` : getDeploymentUrl(dep.client_slug)} 
                                                     target="_blank" 
                                                     rel="noopener noreferrer"
                                                     className="text-[10px] text-zinc-400 hover:text-white font-mono flex items-center gap-0.5 mt-0.5 underline decoration-zinc-700 hover:decoration-zinc-400"
                                                 >
-                                                    {dep.client_slug}.mockbuild.shop
+                                                    {dep.custom_domain ? dep.custom_domain : `${dep.client_slug}.${window.location.hostname.replace(/^(admin|dashboard|www|api)\./i, '')}`}
                                                     <svg className="w-2.5 h-2.5 text-zinc-500 inline" fill="none" stroke="currentColor" strokeWidth="2.5" viewBox="0 0 24 24">
                                                         <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" />
                                                     </svg>
@@ -666,6 +683,15 @@ export default function Dashboard({ onTriggerAgentEdit }) {
                                         </td>
                                         <td className="px-6 py-4">
                                             <Badge variant={getStatusVariant(dep.status)}>{dep.status}</Badge>
+                                        </td>
+                                        <td className="px-6 py-4 font-mono text-[10px] text-zinc-400 whitespace-nowrap">
+                                            {dep.status === 'active' ? (
+                                                <span className="flex flex-col gap-0.5">
+                                                    <span>CPU: <strong className="text-zinc-200">{dep.cpu_usage ?? 0.0}%</strong></span>
+                                                    <span>RAM: <strong className="text-zinc-200">{dep.ram_usage ?? 0.0}MB</strong></span>
+                                                    <span>Disk: <strong className="text-zinc-200">{dep.disk_usage ?? 0.0}MB</strong></span>
+                                                </span>
+                                            ) : '-'}
                                         </td>
                                         <td className="px-6 py-4 text-[11px] text-zinc-400">
                                             {dep.status === 'active' ? (

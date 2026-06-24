@@ -17,10 +17,13 @@ class ServiceTemplate extends Model
         'template_path',
         'is_active',
         'price',
+        'timeout',
+        'version',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'timeout' => 'integer',
     ];
 
     /**

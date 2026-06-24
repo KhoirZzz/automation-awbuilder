@@ -131,6 +131,90 @@ Route::group(['domain' => '{subdomain}.' . $routeDomain], function () {
     })->where('any', '(?!api/).*');
 });
 
+// 2.5 Public template preview route
+Route::any('/templates/{key}/preview/{any?}', function ($key, $any = null) {
+    $template = \App\Models\ServiceTemplate::where('key', $key)->first();
+    if (!$template) {
+        abort(404, "Template not found.");
+    }
+
+    $basePath = config('deploy.template_base_path') . '/' . $template->template_path;
+    $any = $any ? ltrim($any, '/') : 'index.html';
+
+    $filePath = $basePath . '/' . $any;
+    if (!\Illuminate\Support\Facades\File::exists($filePath)) {
+        $directories = \Illuminate\Support\Facades\File::directories($basePath);
+        foreach ($directories as $dir) {
+            if (\Illuminate\Support\Facades\File::exists($dir . '/' . $any)) {
+                $filePath = $dir . '/' . $any;
+                break;
+            }
+        }
+    }
+
+    if (!\Illuminate\Support\Facades\File::exists($filePath) || \Illuminate\Support\Facades\File::isDirectory($filePath)) {
+        $filePath = $basePath . '/index.html';
+        if (!\Illuminate\Support\Facades\File::exists($filePath)) {
+            $directories = \Illuminate\Support\Facades\File::directories($basePath);
+            foreach ($directories as $dir) {
+                if (\Illuminate\Support\Facades\File::exists($dir . '/index.html')) {
+                    $filePath = $dir . '/index.html';
+                    break;
+                }
+            }
+        }
+    }
+
+    if (!\Illuminate\Support\Facades\File::exists($filePath) || \Illuminate\Support\Facades\File::isDirectory($filePath)) {
+        abort(404, "Preview file not found.");
+    }
+
+    if (str_ends_with($filePath, '.php')) {
+        ob_start();
+        http_response_code(200);
+        try {
+            $oldCwd = getcwd();
+            chdir(dirname($filePath));
+            include $filePath;
+            chdir($oldCwd);
+            $output = ob_get_clean();
+
+            $statusCode = http_response_code();
+            if ($statusCode === false) {
+                $statusCode = 200;
+            }
+
+            $response = response($output, $statusCode);
+
+            foreach (headers_list() as $header) {
+                if (strpos($header, ':') !== false) {
+                    [$name, $value] = explode(':', $header, 2);
+                    $name = trim($name);
+                    if (in_array(strtolower($name), ['set-cookie', 'x-powered-by'])) continue;
+                    $response->header($name, trim($value));
+                }
+            }
+
+            return $response;
+        } catch (\Throwable $e) {
+            ob_end_clean();
+            return response("PHP Preview Error: " . $e->getMessage(), 500);
+        }
+    }
+
+    $mime = \Illuminate\Support\Facades\File::mimeType($filePath);
+    if (str_ends_with($filePath, '.css')) {
+        $mime = 'text/css';
+    } elseif (str_ends_with($filePath, '.js')) {
+        $mime = 'application/javascript';
+    } elseif (str_ends_with($filePath, '.html') || str_ends_with($filePath, '.htm')) {
+        $mime = 'text/html';
+    }
+
+    return response(\Illuminate\Support\Facades\File::get($filePath), 200)
+        ->header('Content-Type', $mime);
+})->where('any', '.*');
+
 // 3. Dynamic PDF download route by slug on the main domain/WWW
 Route::get('/{slug}', function ($slug) {
     // Look up deployment by slug

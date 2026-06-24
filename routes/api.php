@@ -10,17 +10,22 @@ Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
 
+use App\Http\Middleware\LogWebhookRequest;
+
 Route::post('/webhook/telegram', [LeadWebhookController::class, 'telegram'])
-    ->middleware(['throttle:webhook', VerifyTelegramSignature::class]);
+    ->middleware([LogWebhookRequest::class, 'throttle:webhook', VerifyTelegramSignature::class]);
 
 Route::get('/webhook/whatsapp', [LeadWebhookController::class, 'whatsapp']);
 Route::post('/webhook/whatsapp', [LeadWebhookController::class, 'whatsapp'])
-    ->middleware(['throttle:webhook', VerifyWhatsappSignature::class]);
+    ->middleware([LogWebhookRequest::class, 'throttle:webhook', VerifyWhatsappSignature::class]);
 
 use App\Http\Controllers\Api\DashboardController;
 
+use App\Http\Controllers\Api\ClientApiController;
+
 Route::get('/public/templates', [DashboardController::class, 'publicTemplates']);
 Route::post('/public/deploy', [DashboardController::class, 'publicDeploy']);
+Route::get('/client/deployment/status', [ClientApiController::class, 'status']);
 
 Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey::class)->group(function () {
     Route::get('/stats', [DashboardController::class, 'stats']);

@@ -15,6 +15,7 @@ class LeadAnalysisResult
         public readonly string $source,
         public readonly string $leadReference,
         public readonly ?int $price,
-        public readonly string $rawLlmResponse
+        public readonly string $rawLlmResponse,
+        public readonly ?string $customDomain = null
     ) {}
 }

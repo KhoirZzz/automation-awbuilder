@@ -22,13 +22,36 @@ class Deployment extends Model
         'status',
         'price',
         'raw_llm_response',
+        'client_token',
+        'custom_domain',
+        'reminder_3_days_sent',
+        'reminder_1_day_sent',
+        'cpu_usage',
+        'ram_usage',
+        'disk_usage',
+        'last_monitored_at',
     ];
 
     protected $casts = [
         'started_at' => 'datetime',
         'expires_at' => 'datetime',
         'status' => DeploymentStatus::class,
+        'reminder_3_days_sent' => 'boolean',
+        'reminder_1_day_sent' => 'boolean',
+        'cpu_usage' => 'double',
+        'ram_usage' => 'double',
+        'disk_usage' => 'double',
+        'last_monitored_at' => 'datetime',
     ];
+
+    protected static function booted()
+    {
+        static::creating(function ($deployment) {
+            if (empty($deployment->client_token)) {
+                $deployment->client_token = \Illuminate\Support\Str::random(32);
+            }
+        });
+    }
 
     /**
      * Get the service template for this deployment.

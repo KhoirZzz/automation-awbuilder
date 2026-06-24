@@ -7,8 +7,12 @@ use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Cache;
 use Tests\TestCase;
 
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
 class LeadWebhookTest extends TestCase
 {
+    use RefreshDatabase;
+
     protected function setUp(): void
     {
         parent::setUp();

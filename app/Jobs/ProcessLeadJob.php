@@ -167,8 +167,17 @@ class ProcessLeadJob implements ShouldQueue
                 'trace' => $e->getTraceAsString()
             ]);
 
+            $errorMessage = $e->getMessage();
+
             if ($chatId) {
-                $botService->sendMessage($chatId, "❌ <b>Pemesanan Gagal</b>\n\nTerjadi kesalahan teknis saat melakukan deployment di VPS. Silakan hubungi admin kami untuk pengecekan manual.");
+                $botService->sendMessage($chatId, "❌ <b>Pemesanan Gagal</b>\n\nTerjadi kesalahan saat melakukan deployment di VPS:\n<code>" . e($errorMessage) . "</code>\n\nSilakan hubungi admin kami untuk bantuan.");
+            }
+
+            // Notify admin
+            $adminChatId = config('services.telegram.admin_chat_id');
+            if ($adminChatId) {
+                $slug = isset($analysisResult) ? $analysisResult->clientSlug : 'N/A';
+                $botService->sendMessage($adminChatId, "⚠️ <b>DEPLOYMENT GAGAL</b>\n\n• Subdomain: <b>{$slug}</b>\n• Source: <b>{$this->source}</b>\n• Lead Reference: <code>{$this->leadReference}</code>\n• Error: <code>" . e($errorMessage) . "</code>");
             }
             // Do not re-throw to avoid infinite retries on static script failures
         }
