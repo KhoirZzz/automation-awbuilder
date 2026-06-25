@@ -60,6 +60,70 @@ export default function Sandbox() {
     const [targetUrl, setTargetUrl] = useState('');
     const [outputPdf, setOutputPdf] = useState('');
 
+    // Telegram Chat ID auto-detect states
+    const [chatInfo, setChatInfo] = useState(null);
+    const [detectLoading, setDetectLoading] = useState(false);
+
+    // Detect Telegram Chat ID type and bot username
+    const handleDetectChat = async () => {
+        if (!telegramToken.trim() || !telegramChatId.trim()) {
+            setChatInfo({ type: 'error', label: '🔴 Token & Chat ID required' });
+            return;
+        }
+
+        setDetectLoading(true);
+        setChatInfo(null);
+
+        try {
+            // Step 1: Verify bot token and get bot username via getMe
+            const meRes = await fetch(`https://api.telegram.org/bot${telegramToken.trim()}/getMe`);
+            const meData = await meRes.json();
+
+            let botUsername = null;
+            if (meData.ok && meData.result) {
+                botUsername = meData.result.username || null;
+            } else {
+                setChatInfo({ type: 'error', label: '🔴 Invalid Bot Token' });
+                setDetectLoading(false);
+                return;
+            }
+
+            // Step 2: Detect chat type via getChat
+            const chatRes = await fetch(`https://api.telegram.org/bot${telegramToken.trim()}/getChat?chat_id=${telegramChatId.trim()}`);
+            const chatData = await chatRes.json();
+
+            if (chatData.ok && chatData.result) {
+                const chat = chatData.result;
+                const chatType = chat.type;
+                const title = chat.title || chat.first_name || '';
+
+                let label, type;
+                if (chatType === 'private') {
+                    label = `🟢 Personal Chat${title ? ` (${title})` : ''}`;
+                    type = 'private';
+                } else if (chatType === 'group' || chatType === 'supergroup') {
+                    label = `🔵 Grup (${title})`;
+                    type = 'group';
+                } else if (chatType === 'channel') {
+                    label = `🟡 Channel (${title})`;
+                    type = 'channel';
+                } else {
+                    label = `⚪ ${chatType}`;
+                    type = 'unknown';
+                }
+
+                setChatInfo({ type, label, botUsername, chatType, title });
+            } else {
+                setChatInfo({ type: 'error', label: '🔴 Invalid Chat ID', botUsername });
+            }
+        } catch (err) {
+            console.error('Detect chat error:', err);
+            setChatInfo({ type: 'error', label: '🔴 Connection Error' });
+        } finally {
+            setDetectLoading(false);
+        }
+    };
+
     // Fetch active templates
     useEffect(() => {
         const fetchTemplates = async () => {
@@ -417,15 +481,43 @@ export default function Sandbox() {
                             </div>
 
                             <div className="space-y-1">
-                                <label className="block font-semibold text-zinc-400 uppercase">Chat ID Telegram</label>
+                                <div className="flex items-center justify-between">
+                                    <label className="block font-semibold text-zinc-400 uppercase">Chat ID Telegram</label>
+                                    <button
+                                        type="button"
+                                        onClick={handleDetectChat}
+                                        disabled={detectLoading}
+                                        className="text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border border-zinc-700 text-zinc-400 hover:text-white hover:border-zinc-500 bg-zinc-900 hover:bg-zinc-800 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                                    >
+                                        {detectLoading ? 'Detecting…' : 'Detect'}
+                                    </button>
+                                </div>
                                 <input
                                     type="text"
                                     required
                                     value={telegramChatId}
-                                    onChange={(e) => setTelegramChatId(e.target.value)}
+                                    onChange={(e) => { setTelegramChatId(e.target.value); setChatInfo(null); }}
                                     placeholder="e.g. 987654321"
                                     className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
                                 />
+                                {chatInfo && (
+                                    <div className={`flex flex-col gap-0.5 text-[11px] font-mono mt-1 px-2 py-1.5 rounded border ${
+                                        chatInfo.type === 'error'
+                                            ? 'bg-red-950/30 border-red-900/50 text-red-400'
+                                            : chatInfo.type === 'private'
+                                                ? 'bg-emerald-950/30 border-emerald-900/50 text-emerald-400'
+                                                : chatInfo.type === 'group'
+                                                    ? 'bg-blue-950/30 border-blue-900/50 text-blue-400'
+                                                    : chatInfo.type === 'channel'
+                                                        ? 'bg-yellow-950/30 border-yellow-900/50 text-yellow-400'
+                                                        : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                                    }`}>
+                                        <span>{chatInfo.label}</span>
+                                        {chatInfo.botUsername && (
+                                            <span className="text-[10px] text-zinc-500">Bot: @{chatInfo.botUsername}</span>
+                                        )}
+                                    </div>
+                                )}
                             </div>
 
                             <div className="space-y-1">
