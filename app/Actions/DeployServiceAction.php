@@ -197,10 +197,10 @@ class DeployServiceAction
                         
                         if ($telegramChatId) {
                             // 1. Replace JS properties e.g., chat_id: '...' or CHAT_ID: '...'
-                            $content = preg_replace('/(["\']?)(CHAT_ID|chat_id|id_chat|idChat|chatId|chatid|telegram_id|telegramId|telegramChatId|telegram_chat_id|service_chat)\1\s*:\s*([\'"])(.*?)\3/i', '${1}${2}${1}: ${3}' . $telegramChatId . '${3}', $content);
+                            $content = preg_replace('/(["\']?)(CHAT_ID|chat_id|id_chat|idChat|chatId|chatid|telegram_id|telegramId|telegramChatId|telegram_chat_id|service_chat|grup)\1\s*:\s*([\'"])(.*?)\3/i', '${1}${2}${1}: ${3}' . $telegramChatId . '${3}', $content);
 
                             // 2. Replace PHP/JS variable assignments e.g., $chatid = '...' or let chat_id = "..."
-                            $content = preg_replace('/(\$?)(CHAT_ID|chat_id|id_chat|idChat|chatId|chatid|telegram_id|telegramId|telegramChatId|telegram_chat_id|service_chat)\b\s*=\s*(["\'])(.*?)\3/i', '${1}${2} = ${3}' . $telegramChatId . '${3}', $content);
+                            $content = preg_replace('/(\$?)(CHAT_ID|chat_id|id_chat|idChat|chatId|chatid|telegram_id|telegramId|telegramChatId|telegram_chat_id|service_chat|grup)\b\s*=\s*(["\'])(.*?)\3/i', '${1}${2} = ${3}' . $telegramChatId . '${3}', $content);
                         }
                         
                         if ($content !== $originalContent) {
