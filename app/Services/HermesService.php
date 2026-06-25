@@ -335,6 +335,15 @@ PROMPT;
             ];
         }
 
+        // First check shared cache (populated by scheduled sync running as awbuilder)
+        if (!app()->runningUnitTests()) {
+            $cached = \Illuminate\Support\Facades\Cache::get('hermes_shared_credentials');
+            if ($cached && !empty($cached['key'])) {
+                return $cached;
+            }
+        }
+
+
         // Check if Nous Portal auth file exists and is readable
         $nousAuth = $this->getNousAccessToken();
         
@@ -365,10 +374,16 @@ PROMPT;
      */
     protected function getNousAccessToken(): ?array
     {
-        $path = '/home/awbuilder/.hermes/auth.json';
+        $home = env('HOME') ?? getenv('HOME') ?? '/home/awbuilder';
+        $path = rtrim($home, '/') . '/.hermes/auth.json';
         if (!file_exists($path)) {
-            return null;
+            // Fallback for production VPS deployment paths
+            $path = '/home/awbuilder/.hermes/auth.json';
+            if (!file_exists($path)) {
+                return null;
+            }
         }
+
 
         $content = file_get_contents($path);
         if (!$content) {
