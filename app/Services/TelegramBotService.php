@@ -199,4 +199,106 @@ class TelegramBotService
             return null;
         }
     }
+
+    /**
+     * Send photo with inline keyboard markup.
+     */
+    public function sendPhotoWithKeyboard(string|int $chatId, string $photoFileId, string $caption, array $keyboard = []): bool
+    {
+        if (empty($this->token)) {
+            Log::channel('deploy-audit')->warning('Telegram bot token not configured. sendPhotoWithKeyboard skipped.');
+            return false;
+        }
+
+        try {
+            $params = [
+                'chat_id' => $chatId,
+                'photo' => $photoFileId,
+                'caption' => $caption,
+                'parse_mode' => 'HTML',
+            ];
+
+            if (!empty($keyboard)) {
+                $params['reply_markup'] = json_encode([
+                    'inline_keyboard' => $keyboard
+                ]);
+            }
+
+            $response = Http::post("https://api.telegram.org/bot{$this->token}/sendPhoto", $params);
+
+            if (!$response->successful()) {
+                Log::channel('deploy-audit')->error('Telegram API error in sendPhotoWithKeyboard.', [
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                return false;
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::channel('deploy-audit')->error('Failed to send photo with keyboard: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Answer Telegram callback query.
+     */
+    public function answerCallbackQuery(string $callbackQueryId, string $text, bool $showAlert = false): bool
+    {
+        if (empty($this->token)) {
+            return false;
+        }
+
+        try {
+            $response = Http::post("https://api.telegram.org/bot{$this->token}/answerCallbackQuery", [
+                'callback_query_id' => $callbackQueryId,
+                'text' => $text,
+                'show_alert' => $showAlert,
+            ]);
+
+            return $response->successful();
+        } catch (\Exception $e) {
+            Log::channel('deploy-audit')->error('Failed to answer callback query: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Edit caption of an existing message.
+     */
+    public function editMessageCaption(string|int $chatId, int $messageId, string $caption, array $keyboard = []): bool
+    {
+        if (empty($this->token)) {
+            return false;
+        }
+
+        try {
+            $params = [
+                'chat_id' => $chatId,
+                'message_id' => $messageId,
+                'caption' => $caption,
+                'parse_mode' => 'HTML',
+            ];
+
+            $params['reply_markup'] = json_encode([
+                'inline_keyboard' => $keyboard
+            ]);
+
+            $response = Http::post("https://api.telegram.org/bot{$this->token}/editMessageCaption", $params);
+
+            if (!$response->successful()) {
+                Log::channel('deploy-audit')->error('Telegram API error in editMessageCaption.', [
+                    'status' => $response->status(),
+                    'body' => $response->body()
+                ]);
+                return false;
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::channel('deploy-audit')->error('Failed to edit message caption: ' . $e->getMessage());
+            return false;
+        }
+    }
 }

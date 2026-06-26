@@ -51,7 +51,6 @@ class ProcessPaymentProofJob implements ShouldQueue
     public function handle(
         PaymentVisionService $visionService,
         TelegramBotService   $adminBot,
-        DeployServiceAction  $deployAction,
     ): void {
         Log::channel('deploy-audit')->info('[PaymentProof] Job started', [
             'file_id'       => $this->fileId,
@@ -76,154 +75,65 @@ class ProcessPaymentProofJob implements ShouldQueue
         $mimeType    = $imageData['mime'] ?? 'image/jpeg';
 
         $extraction = $visionService->extractNominalFromImage($base64Image, $mimeType);
-
         Log::channel('deploy-audit')->info('[PaymentProof] LLM extraction result', $extraction);
 
-        if (!$extraction['success'] || $extraction['nominal'] === null) {
-            $adminBot->sendMessage(
-                config('services.telegram.admin_chat_id'),
-                "🔍 <b>LLM tidak dapat membaca nominal dari bukti bayar.</b>\n\n"
-                . "• Sender: <code>{$this->senderChatId}</code>\n"
-                . "• Confidence: <code>{$extraction['confidence']}</code>\n"
-                . "• Pesan: <i>{$this->messageText}</i>\n\n"
-                . "Silakan approve manual via dashboard.",
-            );
-            return;
-        }
-
-        $detectedNominal = $extraction['nominal'];
+        $detectedNominal = ($extraction['success'] && $extraction['nominal'] !== null) ? $extraction['nominal'] : null;
 
         // ── 3. Find matching deployment ────────────────────────────────────────
-        // Allow ±5% tolerance for bank fee rounding
-        $tolerance = (int) round($detectedNominal * 0.05);
-
-        // Try to narrow by slug hint from message text
+        $deployment = null;
         $slugHint = $this->extractSlugFromText($this->messageText);
 
-        $query = Deployment::where('status', DeploymentStatus::PENDING_PAYMENT->value)
-            ->whereBetween('expected_price', [
-                $detectedNominal - $tolerance,
-                $detectedNominal + $tolerance,
-            ]);
-
+        // Try matching by slug hint first (most reliable)
         if ($slugHint) {
-            $query->where('client_slug', $slugHint);
+            $deployment = Deployment::where('status', DeploymentStatus::PENDING_PAYMENT->value)
+                ->where('client_slug', $slugHint)
+                ->latest()
+                ->first();
         }
 
-        $deployment = $query->latest()->first();
+        // If not found by slug hint, try to match by detected nominal
+        if (!$deployment && $detectedNominal !== null) {
+            // Allow ±5% tolerance for bank fee rounding/uniqueness addition
+            $tolerance = (int) round($detectedNominal * 0.05);
+            $deployment = Deployment::where('status', DeploymentStatus::PENDING_PAYMENT->value)
+                ->whereBetween('expected_price', [
+                    $detectedNominal - $tolerance,
+                    $detectedNominal + $tolerance,
+                ])
+                ->latest()
+                ->first();
+        }
 
-        if (!$deployment) {
-            // Try without slug hint if hint was applied
-            if ($slugHint) {
-                $deployment = Deployment::where('status', DeploymentStatus::PENDING_PAYMENT->value)
-                    ->whereBetween('expected_price', [
-                        $detectedNominal - $tolerance,
-                        $detectedNominal + $tolerance,
-                    ])
-                    ->latest()
-                    ->first();
+        // ── 4. Forward photo to admin with details and Approve button ──────────
+        $adminChatId = config('services.telegram.admin_chat_id');
+        if ($adminChatId) {
+            $keyboard = [];
+            if ($deployment) {
+                $keyboard[] = [
+                    [
+                        'text' => 'Approve Pembayaran ✅',
+                        'callback_data' => 'approve_dep:' . $deployment->id
+                    ]
+                ];
             }
 
-            if (!$deployment) {
-                Log::channel('deploy-audit')->warning('[PaymentProof] No matching deployment found', [
-                    'detected_nominal' => $detectedNominal,
-                    'slug_hint'        => $slugHint,
-                ]);
+            $caption = "📩 <b>Bukti Bayar Baru Masuk!</b>\n\n"
+                . "• Sender Chat ID: <code>{$this->senderChatId}</code>\n"
+                . "• Caption User: <i>" . ($this->messageText ?: 'tidak ada') . "</i>\n"
+                . "• Nominal Terdeteksi (AI): <b>" . ($detectedNominal ? "Rp " . number_format($detectedNominal, 0, ',', '.') : 'Gagal dibaca') . "</b>\n";
 
-                $adminBot->sendMessage(
-                    config('services.telegram.admin_chat_id'),
-                    "⚠️ <b>Tidak ada deployment yang cocok dengan nominal ini.</b>\n\n"
-                    . "• Nominal Terdeteksi: <b>Rp " . number_format($detectedNominal, 0, ',', '.') . "</b>\n"
-                    . "• Slug Hint: <code>" . ($slugHint ?? 'tidak ada') . "</code>\n"
-                    . "• Sender: <code>{$this->senderChatId}</code>\n\n"
-                    . "Minta pembeli menyertakan subdomain-nya atau approve manual.",
-                );
-                return;
+            if ($deployment) {
+                $caption .= "• Subdomain Cocok: <b>{$deployment->client_slug}</b>\n"
+                    . "• Tagihan Expected: <b>Rp " . number_format($deployment->expected_price, 0, ',', '.') . "</b>\n\n"
+                    . "Silakan periksa mutasi rekening Anda. Jika dana sudah masuk, klik tombol di bawah untuk menyetujui (approve) dan mengaktifkan instansi secara otomatis.";
+            } else {
+                $caption .= "• Subdomain Cocok: <b>Tidak ditemukan</b>\n\n"
+                    . "⚠️ <b>Error:</b> Tidak dapat mencocokkan bukti bayar dengan data pending order. "
+                    . "Silakan minta pembeli menyertakan subdomain yang tepat di caption, atau lakukan aktivasi manual via Dashboard Admin.";
             }
+
+            $adminBot->sendPhotoWithKeyboard($adminChatId, $this->fileId, $caption, $keyboard);
         }
-
-        // ── 4. Activate deployment ────────────────────────────────────────────
-        try {
-            $deployment->update([
-                'status'              => DeploymentStatus::ACTIVE->value,
-                'started_at'          => now(),
-                'payment_verified_at' => now(),
-            ]);
-
-            // Run the actual server deployment script
-            $deployAction->activateExistingDeployment($deployment);
-
-            Log::channel('deploy-audit')->info('[PaymentProof] Deployment activated', [
-                'deployment_id' => $deployment->id,
-                'client_slug'   => $deployment->client_slug,
-            ]);
-        } catch (\Throwable $e) {
-            Log::channel('deploy-audit')->error('[PaymentProof] Failed to activate deployment', [
-                'deployment_id' => $deployment->id,
-                'error'         => $e->getMessage(),
-            ]);
-
-            $adminBot->sendMessage(
-                config('services.telegram.admin_chat_id'),
-                "❌ <b>Pembayaran terverifikasi tapi deployment gagal diaktifkan!</b>\n\n"
-                . "• Slug: <b>{$deployment->client_slug}</b>\n"
-                . "• Error: <code>" . e($e->getMessage()) . "</code>\n\n"
-                . "Coba retry manual di dashboard.",
-            );
-            return;
-        }
-
-        // ── 5. Build client URL ────────────────────────────────────────────────
-        $clientUrl = "https://{$deployment->client_slug}.mockbuild.shop";
-
-        // ── 6. Notify buyer via their bot token ────────────────────────────────
-        $buyerChatId = $deployment->buyer_telegram_chat_id;
-        $buyerToken  = $deployment->buyer_telegram_token;
-
-        if ($buyerChatId && $buyerToken) {
-            try {
-                $serviceTemplate = $deployment->serviceTemplate;
-                $serviceLabel    = $serviceTemplate?->name ?? 'Layanan';
-                $expiresAt       = $deployment->expires_at?->locale('id')->isoFormat('D MMMM Y') ?? '-';
-
-                $buyerMessage = "✅ <b>Pembayaran Terverifikasi!</b>\n\n"
-                    . "Halo! Pembayaran Anda telah dikonfirmasi oleh sistem kami.\n\n"
-                    . "📦 <b>Detail Instansi Anda:</b>\n"
-                    . "• Layanan: <b>{$serviceLabel}</b>\n"
-                    . "• URL: <b>{$clientUrl}</b>\n"
-                    . "• Masa Aktif: <b>s.d. {$expiresAt}</b>\n\n"
-                    . "🔗 Akses URL Anda sekarang:\n"
-                    . "<a href=\"{$clientUrl}\">{$clientUrl}</a>\n\n"
-                    . "Jika ada masalah, hubungi admin: @awbuilderadmin";
-
-                Http::post("https://api.telegram.org/bot{$buyerToken}/sendMessage", [
-                    'chat_id'    => $buyerChatId,
-                    'text'       => $buyerMessage,
-                    'parse_mode' => 'HTML',
-                ]);
-
-                Log::channel('deploy-audit')->info('[PaymentProof] Buyer notified via their bot', [
-                    'buyer_chat_id' => $buyerChatId,
-                    'url'           => $clientUrl,
-                ]);
-            } catch (\Exception $e) {
-                Log::channel('deploy-audit')->warning('[PaymentProof] Failed to notify buyer via their bot', [
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-
-        // ── 7. Notify admin of success ─────────────────────────────────────────
-        $adminBot->sendMessage(
-            config('services.telegram.admin_chat_id'),
-            "✅ <b>Pembayaran Terverifikasi & Deployment Aktif!</b>\n\n"
-            . "• Slug: <b>{$deployment->client_slug}</b>\n"
-            . "• URL: <a href=\"{$clientUrl}\">{$clientUrl}</a>\n"
-            . "• Nominal: <b>Rp " . number_format($detectedNominal, 0, ',', '.') . "</b>\n"
-            . "• Expected: <b>Rp " . number_format($deployment->expected_price, 0, ',', '.') . "</b>\n"
-            . "• Buyer Chat ID: <code>{$buyerChatId}</code>\n"
-            . "• Status Notifikasi Buyer: " . ($buyerChatId ? "✅ Terkirim" : "⚠️ Tidak ada chat ID"),
-        );
     }
 
     /**

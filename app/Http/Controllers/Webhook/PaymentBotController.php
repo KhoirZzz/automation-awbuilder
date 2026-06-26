@@ -5,21 +5,15 @@ namespace App\Http\Controllers\Webhook;
 use App\Http\Controllers\Controller;
 use App\Jobs\ProcessPaymentProofJob;
 use App\Services\TelegramBotService;
+use App\Models\Deployment;
+use App\Enums\DeploymentStatus;
+use App\Actions\DeployServiceAction;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
-/**
- * PaymentBotController
- *
- * Receives webhook updates from the admin Telegram bot.
- * When a buyer sends their payment proof (photo/image) to the admin bot,
- * this controller dispatches ProcessPaymentProofJob to verify it via LLM.
- *
- * Webhook URL: POST /webhook/payment-bot
- * Set via: https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://mockbuild.shop/api/webhook/payment-bot
- */
 class PaymentBotController extends Controller
 {
     public function __construct(private readonly TelegramBotService $adminBot)
@@ -47,6 +41,11 @@ class PaymentBotController extends Controller
             Cache::put($cacheKey, true, now()->addMinutes(10));
         }
 
+        // ── Handle Callback Query (Approve button click) ──────────────────────
+        if (isset($update['callback_query'])) {
+            return $this->handleCallbackQuery($update['callback_query']);
+        }
+
         $message   = $update['message'] ?? $update['channel_post'] ?? null;
         if (!$message) {
             return response()->json(['status' => 'no_message']);
@@ -65,7 +64,7 @@ class PaymentBotController extends Controller
                 . "1️⃣ Kirim <b>screenshot/foto bukti transfer</b> ke chat ini\n"
                 . "2️⃣ Sertakan <b>subdomain</b> Anda di caption foto\n"
                 . "   Contoh caption: <code>toko-saya</code>\n\n"
-                . "Bot akan otomatis memverifikasi dan mengaktifkan instansi Anda.\n\n"
+                . "Bukti bayar Anda akan dikirim ke Admin untuk divalidasi secara manual.\n\n"
                 . "❓ Butuh bantuan? Hubungi: @awbuilderadmin",
             );
             return response()->json(['status' => 'ok']);
@@ -95,21 +94,9 @@ class PaymentBotController extends Controller
             $this->adminBot->sendMessage(
                 $senderChatId,
                 "🔍 <b>Bukti bayar diterima!</b>\n\n"
-                . "Sistem sedang memverifikasi nominal pembayaran Anda via AI...\n"
-                . "⏳ Mohon tunggu 15-30 detik.",
+                . "Bukti transfer Anda sedang diteruskan ke Admin untuk divalidasi.\n"
+                . "⏳ Mohon tunggu sebentar, Anda akan menerima notifikasi di sini setelah disetujui.",
             );
-
-            // Also forward to admin with context
-            $adminChatId = config('services.telegram.admin_chat_id');
-            if ($adminChatId && $adminChatId !== $senderChatId) {
-                $this->adminBot->sendMessage(
-                    $adminChatId,
-                    "📩 <b>Bukti bayar masuk dari buyer!</b>\n\n"
-                    . "• Sender Chat ID: <code>{$senderChatId}</code>\n"
-                    . "• Caption: <i>" . ($messageText ?: 'tidak ada') . "</i>\n\n"
-                    . "Sistem sedang memproses verifikasi otomatis...",
-                );
-            }
 
             // Dispatch to queue
             ProcessPaymentProofJob::dispatch($fileId, $senderChatId, $messageText, $messageId);
@@ -131,7 +118,9 @@ class PaymentBotController extends Controller
 
                 $this->adminBot->sendMessage(
                     $senderChatId,
-                    "🔍 <b>Dokumen bukti bayar diterima!</b>\n\nSistem sedang memverifikasi...",
+                    "🔍 <b>Dokumen bukti bayar diterima!</b>\n\n"
+                    . "Bukti transfer Anda sedang diteruskan ke Admin untuk divalidasi.\n"
+                    . "⏳ Mohon tunggu sebentar.",
                 );
 
                 ProcessPaymentProofJob::dispatch($fileId, $senderChatId, $messageText, $messageId);
@@ -151,5 +140,97 @@ class PaymentBotController extends Controller
         }
 
         return response()->json(['status' => 'ok']);
+    }
+
+    /**
+     * Handle callback query when admin clicks the Approve inline button.
+     */
+    private function handleCallbackQuery(array $callbackQuery): JsonResponse
+    {
+        $callbackQueryId = $callbackQuery['id'];
+        $data = $callbackQuery['data'] ?? '';
+        $adminChatId = (string) ($callbackQuery['message']['chat']['id'] ?? '');
+        $messageId = $callbackQuery['message']['message_id'] ?? null;
+        $caption = $callbackQuery['message']['caption'] ?? $callbackQuery['message']['text'] ?? '';
+
+        Log::channel('deploy-audit')->info('[PaymentBot] Callback query received', [
+            'id' => $callbackQueryId,
+            'data' => $data,
+            'admin_chat_id' => $adminChatId,
+        ]);
+
+        if (str_starts_with($data, 'approve_dep:')) {
+            $deploymentId = (int) str_replace('approve_dep:', '', $data);
+            $deployment = Deployment::find($deploymentId);
+
+            if (!$deployment) {
+                $this->adminBot->answerCallbackQuery($callbackQueryId, 'Deployment tidak ditemukan!', true);
+                return response()->json(['status' => 'error_not_found']);
+            }
+
+            if ($deployment->status === DeploymentStatus::ACTIVE->value) {
+                $this->adminBot->answerCallbackQuery($callbackQueryId, 'Layanan ini sudah aktif!', false);
+                return response()->json(['status' => 'already_active']);
+            }
+
+            try {
+                // Activate the deployment
+                $deployment->update([
+                    'status'              => DeploymentStatus::ACTIVE->value,
+                    'started_at'          => now(),
+                    'payment_verified_at' => now(),
+                ]);
+
+                // Run activation action
+                $deployAction = app(DeployServiceAction::class);
+                $deployAction->activateExistingDeployment($deployment);
+
+                // Notify admin with answerCallbackQuery popup
+                $this->adminBot->answerCallbackQuery($callbackQueryId, 'Pembayaran disetujui & layanan aktif!', false);
+
+                // Edit the original message to remove the keyboard and add approval status
+                $clientUrl = "https://{$deployment->client_slug}.mockbuild.shop";
+                $updatedCaption = $caption . "\n\n🟢 <b>STATUS: APPROVED</b> oleh Admin pada " . now()->format('d/m/Y H:i') . "\nURL: <a href=\"{$clientUrl}\">{$clientUrl}</a>";
+                
+                $this->adminBot->editMessageCaption($adminChatId, $messageId, $updatedCaption, []);
+
+                // Notify buyer via their bot token
+                $buyerChatId = $deployment->buyer_telegram_chat_id;
+                $buyerToken  = $deployment->buyer_telegram_token;
+
+                if ($buyerChatId && $buyerToken) {
+                    $serviceTemplate = $deployment->serviceTemplate;
+                    $serviceLabel    = $serviceTemplate?->name ?? 'Layanan';
+                    $expiresAt       = $deployment->expires_at?->locale('id')->isoFormat('D MMMM Y') ?? '-';
+
+                    $buyerMessage = "✅ <b>Pembayaran Terverifikasi!</b>\n\n"
+                        . "Halo! Pembayaran Anda telah dikonfirmasi dan disetujui oleh admin.\n\n"
+                        . "📦 <b>Detail Instansi Anda:</b>\n"
+                        . "• Layanan: <b>{$serviceLabel}</b>\n"
+                        . "• URL: <b>{$clientUrl}</b>\n"
+                        . "• Masa Aktif: <b>s.d. {$expiresAt}</b>\n\n"
+                        . "🔗 Akses URL Anda sekarang:\n"
+                        . "<a href=\"{$clientUrl}\">{$clientUrl}</a>\n\n"
+                        . "Jika ada masalah, hubungi admin: @awbuilderadmin";
+
+                    Http::post("https://api.telegram.org/bot{$buyerToken}/sendMessage", [
+                        'chat_id'    => $buyerChatId,
+                        'text'       => $buyerMessage,
+                        'parse_mode' => 'HTML',
+                    ]);
+                }
+
+                return response()->json(['status' => 'approved']);
+            } catch (\Throwable $e) {
+                Log::channel('deploy-audit')->error('[PaymentBot] Manual approval error', [
+                    'deployment_id' => $deploymentId,
+                    'error' => $e->getMessage(),
+                ]);
+                $this->adminBot->answerCallbackQuery($callbackQueryId, 'Error: ' . $e->getMessage(), true);
+                return response()->json(['status' => 'error_activation']);
+            }
+        }
+
+        return response()->json(['status' => 'unknown_callback']);
     }
 }
