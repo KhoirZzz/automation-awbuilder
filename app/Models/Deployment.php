@@ -30,18 +30,25 @@ class Deployment extends Model
         'ram_usage',
         'disk_usage',
         'last_monitored_at',
+        // Buyer payment flow columns
+        'buyer_telegram_chat_id',
+        'buyer_telegram_token',
+        'expected_price',
+        'payment_verified_at',
     ];
 
     protected $casts = [
-        'started_at' => 'datetime',
-        'expires_at' => 'datetime',
-        'status' => DeploymentStatus::class,
-        'reminder_3_days_sent' => 'boolean',
-        'reminder_1_day_sent' => 'boolean',
-        'cpu_usage' => 'double',
-        'ram_usage' => 'double',
-        'disk_usage' => 'double',
-        'last_monitored_at' => 'datetime',
+        'started_at'             => 'datetime',
+        'expires_at'             => 'datetime',
+        'status'                 => DeploymentStatus::class,
+        'reminder_3_days_sent'   => 'boolean',
+        'reminder_1_day_sent'    => 'boolean',
+        'cpu_usage'              => 'double',
+        'ram_usage'              => 'double',
+        'disk_usage'             => 'double',
+        'last_monitored_at'      => 'datetime',
+        'payment_verified_at'    => 'datetime',
+        'expected_price'         => 'integer',
     ];
 
     protected static function booted()

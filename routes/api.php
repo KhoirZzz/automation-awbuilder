@@ -22,10 +22,16 @@ Route::post('/webhook/whatsapp', [LeadWebhookController::class, 'whatsapp'])
 use App\Http\Controllers\Api\DashboardController;
 
 use App\Http\Controllers\Api\ClientApiController;
+use App\Http\Controllers\Webhook\PaymentBotController;
 
 Route::get('/public/templates', [DashboardController::class, 'publicTemplates']);
 Route::post('/public/deploy', [DashboardController::class, 'publicDeploy']);
 Route::get('/client/deployment/status', [ClientApiController::class, 'status']);
+
+// Payment bot webhook — receives payment proof images from buyers sent to admin Telegram bot
+// Register via: https://api.telegram.org/bot{TOKEN}/setWebhook?url=https://mockbuild.shop/api/webhook/payment-bot
+Route::post('/webhook/payment-bot', [PaymentBotController::class, 'handle'])
+    ->middleware(['throttle:60,1']);
 
 Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey::class)->group(function () {
     Route::get('/stats', [DashboardController::class, 'stats']);

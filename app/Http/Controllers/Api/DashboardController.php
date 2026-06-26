@@ -1170,9 +1170,9 @@ class DashboardController extends Controller
                 return response()->json(['success' => false, 'error' => 'Subdomain merupakan kata terlarang.'], 400);
             }
 
-            // Check duplicates
+            // Check duplicates (include PENDING_PAYMENT in the uniqueness check)
             $duplicate = Deployment::where('client_slug', $clientSlug)
-                ->whereIn('status', [DeploymentStatus::PENDING, DeploymentStatus::ACTIVE])
+                ->whereIn('status', [DeploymentStatus::PENDING, DeploymentStatus::ACTIVE, DeploymentStatus::PENDING_PAYMENT])
                 ->first();
             if ($duplicate) {
                 return response()->json(['success' => false, 'error' => 'Subdomain ini sudah aktif digunakan.'], 400);
@@ -1202,8 +1202,15 @@ class DashboardController extends Controller
                 ])
             );
 
-            // Execute deployment
+            // Execute deployment (builds files, status = PENDING_PAYMENT)
             $deployment = $deployAction->execute($result);
+
+            // ── Save buyer telegram info & expected price ──────────────────────
+            $deployment->update([
+                'buyer_telegram_chat_id' => $validated['telegram_chat_id'],
+                'buyer_telegram_token'   => $validated['telegram_token'],
+                'expected_price'         => $price,
+            ]);
 
             // Construct final URL
             $host = $request->getHost();
@@ -1211,25 +1218,65 @@ class DashboardController extends Controller
             if (!preg_match('/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/', $host)) {
                 $baseDomain = preg_replace('/^(admin|dashboard|www|api)\./i', '', $host);
             }
-            $clientUrl = "http://{$clientSlug}.{$baseDomain}";
+            $clientUrl = "https://{$clientSlug}.{$baseDomain}";
 
-            // Notify Admin via Telegram bot
+            // ── Generate PDF invoice & send to admin ──────────────────────────
             $adminChatId = config('services.telegram.admin_chat_id');
-            if ($adminChatId) {
-                try {
-                    $botService = app(\App\Services\TelegramBotService::class);
-                    $botService->sendMessage($adminChatId, "<b>🔔 PEMESANAN WEB BARU MENUNGGU PERSETUJUAN</b>\n\n• Source: <b>Web Checkout</b>\n• Subdomain: <b>{$clientSlug}</b>\n• Durasi Sewa: <b>{$durationEnum->value}</b>\n• Harga: <b>Belum Ditetapkan</b>\n\nSilakan verifikasi bukti pembayaran QRIS dari client, lalu approve di dashboard atau ketik:\n<code>/approve {$clientSlug} &lt;nominal_harga&gt;</code>");
-                } catch (\Exception $ex) {
-                    \Illuminate\Support\Facades\Log::error('Failed to send telegram admin notification: ' . $ex->getMessage());
+            try {
+                $invoiceService = app(\App\Services\InvoicePdfService::class);
+                $botService     = app(\App\Services\TelegramBotService::class);
+
+                $durationLabels = [
+                    '1_minggu' => '1 Minggu',
+                    '1_bulan'  => '1 Bulan',
+                    '3_bulan'  => '3 Bulan',
+                    '6_bulan'  => '6 Bulan',
+                    '1_tahun'  => '1 Tahun',
+                ];
+                $durationLabel = $durationLabels[$validated['durasi']] ?? $validated['durasi'];
+
+                $invoicePath = $invoiceService->generate([
+                    'lead_reference' => $result->leadReference,
+                    'client_slug'    => $clientSlug,
+                    'service_name'   => $serviceTemplate->name,
+                    'duration_label' => $durationLabel,
+                    'price'          => $price,
+                    'url'            => $clientUrl,
+                    'expires_at'     => $result->expiresAt->format('d M Y'),
+                    'created_at'     => now()->format('d M Y H:i'),
+                ]);
+
+                if ($adminChatId) {
+                    // Send PDF invoice to admin
+                    $invoiceCaption = "<b>🛒 PEMESANAN BARU — MENUNGGU PEMBAYARAN</b>\n\n"
+                        . "• Ref: <code>{$result->leadReference}</code>\n"
+                        . "• Subdomain: <b>{$clientSlug}</b>\n"
+                        . "• URL: <a href=\"{$clientUrl}\">{$clientUrl}</a>\n"
+                        . "• Layanan: <b>{$serviceTemplate->name}</b>\n"
+                        . "• Durasi: <b>{$durationLabel}</b>\n"
+                        . "• Harga: <b>Rp " . number_format((int)$price, 0, ',', '.') . "</b>\n"
+                        . "• Buyer Chat ID: <code>{$validated['telegram_chat_id']}</code>\n\n"
+                        . "⏳ Menunggu bukti bayar dari buyer.\n"
+                        . "Bot akan otomatis verifikasi & aktivasi setelah buyer kirim bukti.";
+
+                    if ($invoicePath) {
+                        $botService->sendDocument($adminChatId, $invoicePath, $invoiceCaption);
+                        $invoiceService->cleanup($invoicePath);
+                    } else {
+                        $botService->sendMessage($adminChatId, $invoiceCaption);
+                    }
                 }
+            } catch (\Exception $ex) {
+                \Illuminate\Support\Facades\Log::error('[publicDeploy] Failed to send invoice/notification: ' . $ex->getMessage());
             }
 
             return response()->json([
-                'success' => true,
-                'message' => 'Pemesanan berhasil dikonfigurasi.',
-                'url' => $clientUrl,
-                'price' => $price,
-                'deployment' => $deployment
+                'success'        => true,
+                'message'        => 'Pemesanan berhasil dikonfigurasi.',
+                'url'            => $clientUrl,
+                'price'          => $price,
+                'lead_reference' => $result->leadReference,
+                'deployment'     => $deployment
             ]);
         } catch (\Throwable $e) {
             // Notify Admin about the failure and include the credentials

@@ -82,4 +82,121 @@ class TelegramBotService
             return $this->sendMessage($chatId, $caption . "\n\n(QRIS URL: {$photoUrl})");
         }
     }
+
+    /**
+     * Send a document file (e.g. PDF invoice) via local path.
+     *
+     * @param string|int $chatId
+     * @param string     $filePath Absolute local path to the file
+     * @param string     $caption  Caption for the document
+     * @param string|null $token   Override bot token (e.g. buyer's bot). Uses admin bot if null.
+     */
+    public function sendDocument(string|int $chatId, string $filePath, string $caption = '', ?string $token = null): bool
+    {
+        $useToken = $token ?? $this->token;
+
+        if (empty($useToken)) {
+            Log::channel('deploy-audit')->warning('Telegram token not configured. sendDocument skipped.', [
+                'chat_id' => $chatId,
+            ]);
+            return false;
+        }
+
+        if (!file_exists($filePath)) {
+            Log::channel('deploy-audit')->error('sendDocument: file does not exist', ['path' => $filePath]);
+            return false;
+        }
+
+        try {
+            $response = Http::withToken($useToken)
+                ->attach('document', file_get_contents($filePath), basename($filePath))
+                ->post("https://api.telegram.org/bot{$useToken}/sendDocument", [
+                    'chat_id'    => $chatId,
+                    'caption'    => $caption,
+                    'parse_mode' => 'HTML',
+                ]);
+
+            if (!$response->successful()) {
+                Log::channel('deploy-audit')->error('Telegram API error sending document.', [
+                    'status' => $response->status(),
+                    'body'   => $response->body(),
+                ]);
+                return false;
+            }
+
+            return true;
+        } catch (\Exception $e) {
+            Log::channel('deploy-audit')->error('Failed to send Telegram document: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Download a file from Telegram by its file_id.
+     * Returns ['content' => binary_string, 'mime' => 'image/jpeg'] or null on failure.
+     *
+     * @param string      $fileId   Telegram file_id
+     * @param string|null $token    Override bot token. Uses admin bot if null.
+     * @return array{content: string, mime: string}|null
+     */
+    public function downloadFile(string $fileId, ?string $token = null): ?array
+    {
+        $useToken = $token ?? $this->token;
+
+        if (empty($useToken)) {
+            Log::channel('deploy-audit')->warning('Telegram token not configured. downloadFile skipped.');
+            return null;
+        }
+
+        try {
+            // Step 1: Get file path from Telegram
+            $fileResponse = Http::get("https://api.telegram.org/bot{$useToken}/getFile", [
+                'file_id' => $fileId,
+            ]);
+
+            if (!$fileResponse->successful()) {
+                Log::channel('deploy-audit')->error('[TelegramBotService] getFile failed', [
+                    'status' => $fileResponse->status(),
+                    'body'   => $fileResponse->body(),
+                ]);
+                return null;
+            }
+
+            $filePath = $fileResponse->json('result.file_path');
+            if (!$filePath) {
+                Log::channel('deploy-audit')->error('[TelegramBotService] No file_path in getFile response');
+                return null;
+            }
+
+            // Step 2: Download the actual file
+            $downloadUrl  = "https://api.telegram.org/file/bot{$useToken}/{$filePath}";
+            $fileContents = Http::timeout(30)->get($downloadUrl);
+
+            if (!$fileContents->successful()) {
+                Log::channel('deploy-audit')->error('[TelegramBotService] File download failed', [
+                    'url'    => $downloadUrl,
+                    'status' => $fileContents->status(),
+                ]);
+                return null;
+            }
+
+            // Determine MIME type from file extension
+            $ext  = strtolower(pathinfo($filePath, PATHINFO_EXTENSION));
+            $mime = match ($ext) {
+                'jpg', 'jpeg' => 'image/jpeg',
+                'png'         => 'image/png',
+                'gif'         => 'image/gif',
+                'webp'        => 'image/webp',
+                default       => 'image/jpeg',
+            };
+
+            return [
+                'content' => $fileContents->body(),
+                'mime'    => $mime,
+            ];
+        } catch (\Exception $e) {
+            Log::channel('deploy-audit')->error('[TelegramBotService] Exception in downloadFile: ' . $e->getMessage());
+            return null;
+        }
+    }
 }

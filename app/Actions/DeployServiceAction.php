@@ -320,6 +320,56 @@ class DeployServiceAction
         }
     }
 
+
+    /**
+     * Activate an existing PENDING_PAYMENT deployment after payment is verified.
+     *
+     * This is called by ProcessPaymentProofJob. The files are already in place
+     * (template was cloned during initial publicDeploy). This method just
+     * re-runs deploy.sh if present and flips the status to ACTIVE.
+     *
+     * @param Deployment $deployment
+     * @throws Exception
+     */
+    public function activateExistingDeployment(Deployment $deployment): void
+    {
+        $instancePath = $deployment->instance_path;
+
+        if (!File::isDirectory($instancePath)) {
+            throw new Exception("Instance directory not found: {$instancePath}");
+        }
+
+        $serviceTemplate = $deployment->serviceTemplate;
+
+        // Re-run deploy.sh if it exists
+        $scriptPath = $instancePath . '/deploy.sh';
+        if (File::exists($scriptPath)) {
+            Log::channel('deploy-audit')->info('[ActivateDeployment] Running deploy.sh on existing instance', [
+                'deployment_id' => $deployment->id,
+                'instance_path' => $instancePath,
+            ]);
+
+            $timeout       = $serviceTemplate?->timeout ?: 60;
+            $processResult = Process::path($instancePath)
+                ->timeout($timeout)
+                ->run(['bash', 'deploy.sh', $deployment->client_slug]);
+
+            if (!$processResult->successful()) {
+                $errorMsg = 'deploy.sh failed on activation: exit=' . $processResult->exitCode()
+                    . ' stderr=' . trim($processResult->errorOutput());
+                Log::channel('deploy-audit')->error('[ActivateDeployment] ' . $errorMsg);
+                throw new Exception($errorMsg);
+            }
+        }
+
+        $this->setPermissionsRecursive($instancePath);
+
+        Log::channel('deploy-audit')->info('[ActivateDeployment] Deployment activated successfully', [
+            'deployment_id' => $deployment->id,
+            'client_slug'   => $deployment->client_slug,
+        ]);
+    }
+
     /**
      * Recursively set group-writable permissions on files and folders.
      */
@@ -354,18 +404,18 @@ class DeployServiceAction
         $data = Cache::get($cacheKey);
         if (!is_array($data)) {
             $data = [
-                'stage' => $stage,
-                'status' => $status,
+                'stage'   => $stage,
+                'status'  => $status,
                 'message' => $message,
-                'stages' => []
+                'stages'  => []
             ];
         }
 
-        $data['stage'] = $stage;
-        $data['status'] = $status;
-        $data['message'] = $message;
-        $data['stages'][$stage] = [
-            'status' => $status,
+        $data['stage']            = $stage;
+        $data['status']           = $status;
+        $data['message']          = $message;
+        $data['stages'][$stage]   = [
+            'status'  => $status,
             'message' => $message
         ];
 

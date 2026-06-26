@@ -473,11 +473,12 @@ function Landing() {
 
                 {/* ── STEP 3: Invoice & Payment ── */}
                 {step === 3 && result && (
-                    <div className="max-w-lg mx-auto space-y-6">
+                    <div className="max-w-lg mx-auto space-y-5">
+                        {/* Success header */}
                         <div className="text-center space-y-1">
-                            <div className="h-12 w-12 mx-auto rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-2xl mb-3">🎉</div>
+                            <div className="h-14 w-14 mx-auto rounded-full bg-emerald-500/20 border-2 border-emerald-500/50 flex items-center justify-center text-3xl mb-3 animate-bounce">🎉</div>
                             <h2 className="text-xl font-extrabold text-white">Pesanan Berhasil Dibuat!</h2>
-                            <p className="text-zinc-500 text-xs">Lakukan pembayaran lalu kirim bukti transfer ke admin.</p>
+                            <p className="text-zinc-500 text-xs">Invoice telah dikirim ke admin. Lakukan pembayaran & kirim bukti ke bot kami.</p>
                         </div>
 
                         {/* Invoice card */}
@@ -489,46 +490,78 @@ function Landing() {
                             <div className="p-5 space-y-3 text-xs">
                                 {[
                                     ['Layanan', `${SERVICE_META[selected?.key]?.headline || selected?.name}`],
-                                    ['Subdomain / URL', result.url || `https://${slug}.mockbuild.shop`],
+                                    ['Subdomain', slug],
+                                    ['URL Instansi', result.url || `https://${slug}.mockbuild.shop`],
                                     ['Durasi', DURATIONS.find(d => d.value === durasi)?.label],
                                     ['Status', '⏳ Menunggu Pembayaran'],
                                 ].map(([label, value]) => (
                                     <div key={label} className="flex justify-between items-start gap-4">
                                         <span className="text-zinc-500 shrink-0">{label}:</span>
-                                        <span className={`text-right font-semibold ${label === 'Status' ? 'text-yellow-400' : 'text-white'} break-all`}>{value}</span>
+                                        <span className={`text-right font-semibold ${label === 'Status' ? 'text-yellow-400' : 'text-white'} break-all font-mono`}>{value}</span>
                                     </div>
                                 ))}
                                 <div className="border-t border-zinc-800 pt-3 flex justify-between items-center">
                                     <span className="text-zinc-400 font-bold uppercase">Total Bayar:</span>
-                                    <span className="text-white font-extrabold text-base">{result.price ? formatRp(result.price) : formatRp(totalPrice)}</span>
+                                    <span className="text-orange-400 font-extrabold text-lg">{result.price ? formatRp(result.price) : formatRp(totalPrice)}</span>
                                 </div>
                             </div>
                         </div>
 
-                        {/* Payment instruction */}
-                        <div className="rounded-xl border border-zinc-800 bg-zinc-950 overflow-hidden">
-                            <div className="px-5 py-3 border-b border-zinc-800 bg-zinc-900/50">
-                                <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">💳 Instruksi Pembayaran</span>
+                        {/* Payment instruction — AI auto verify */}
+                        <div className="rounded-xl border border-orange-800/50 bg-orange-950/20 overflow-hidden">
+                            <div className="px-5 py-3 border-b border-orange-800/30 bg-orange-900/20 flex items-center gap-2">
+                                <span className="text-lg">🤖</span>
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-orange-300">Verifikasi Otomatis via AI Bot</span>
                             </div>
-                            <div className="p-5 flex flex-col sm:flex-row gap-5">
-                                <div className="shrink-0 bg-white p-2 rounded-lg self-center sm:self-start">
-                                    <img src="/logo/qris.png" alt="QRIS" className="h-28 w-28 object-contain" onError={e => e.target.style.display='none'} />
+                            <div className="p-5 space-y-4">
+                                <p className="text-[11px] text-zinc-400 leading-relaxed">
+                                    Sistem kami menggunakan <span className="text-white font-bold">AI Vision</span> untuk membaca bukti bayar Anda secara otomatis.
+                                    Setelah terverifikasi, instansi langsung aktif dan URL dikirim ke bot Telegram Anda.
+                                </p>
+
+                                {/* QRIS + Steps */}
+                                <div className="flex flex-col sm:flex-row gap-4">
+                                    <div className="shrink-0 bg-white p-2 rounded-lg self-center sm:self-start">
+                                        <img src="/logo/qris.png" alt="QRIS" className="h-24 w-24 object-contain" onError={e => e.target.style.display='none'} />
+                                    </div>
+                                    <div className="space-y-2.5 flex-1">
+                                        <span className="text-[10px] font-bold text-white uppercase block">Langkah Pembayaran:</span>
+                                        <ol className="space-y-2 text-[11px] text-zinc-400 list-none">
+                                            {[
+                                                <span>Scan <strong className="text-white">QRIS</strong> atau transfer ke rekening admin.</span>,
+                                                <span>Buka Telegram dan kirim foto bukti bayar ke bot admin: <a href="https://t.me/awbuilderadmin" target="_blank" rel="noopener noreferrer" className="text-orange-400 font-bold underline">@awbuilderadmin</a></span>,
+                                                <span>Di caption foto, sertakan subdomain Anda: <span className="bg-zinc-900 border border-zinc-700 px-1.5 py-0.5 rounded font-mono text-orange-300">{slug}</span></span>,
+                                                <span><strong className="text-white">AI Bot</strong> akan membaca nominalnya & langsung aktifkan instansi Anda otomatis.</span>,
+                                            ].map((step, i) => (
+                                                <li key={i} className="flex gap-2">
+                                                    <span className="h-4 w-4 rounded-full bg-orange-500/20 border border-orange-700/50 text-orange-400 font-bold text-[9px] flex items-center justify-center shrink-0 mt-0.5">{i+1}</span>
+                                                    <span>{step}</span>
+                                                </li>
+                                            ))}
+                                        </ol>
+                                    </div>
                                 </div>
-                                <div className="space-y-3">
-                                    <span className="text-[11px] font-bold text-white uppercase block">Cara Bayar:</span>
-                                    <ol className="space-y-2 text-[11px] text-zinc-400 list-none">
-                                        {[
-                                            'Scan kode QRIS di samping menggunakan aplikasi e-wallet atau mobile banking.',
-                                            <span>Kirim bukti transfer ke Admin Telegram: <a href="https://t.me/awbuilderadmin" target="_blank" rel="noopener noreferrer" className="text-white font-bold underline">@awbuilderadmin</a></span>,
-                                            'Sertakan subdomain / URL instansi Anda saat menghubungi admin.',
-                                            'Setelah pembayaran diverifikasi, instansi akan langsung aktif otomatis.',
-                                        ].map((step, i) => (
-                                            <li key={i} className="flex gap-2">
-                                                <span className="h-4 w-4 rounded-full bg-zinc-800 text-zinc-400 font-bold text-[9px] flex items-center justify-center shrink-0 mt-0.5">{i+1}</span>
-                                                <span>{step}</span>
-                                            </li>
-                                        ))}
-                                    </ol>
+
+                                {/* Copy slug helper */}
+                                <div className="bg-zinc-900 border border-zinc-800 rounded-lg p-3 flex items-center justify-between gap-3">
+                                    <div>
+                                        <span className="text-[9px] text-zinc-600 uppercase font-bold block">Caption yang perlu Anda kirim:</span>
+                                        <span className="font-mono text-orange-300 text-xs font-bold">{slug}</span>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            navigator.clipboard?.writeText(slug);
+                                        }}
+                                        className="text-[9px] px-2.5 py-1.5 rounded bg-zinc-800 border border-zinc-700 text-zinc-400 hover:text-white hover:bg-zinc-700 font-bold uppercase tracking-wider transition-all shrink-0"
+                                    >
+                                        📋 Salin
+                                    </button>
+                                </div>
+
+                                {/* AI verification note */}
+                                <div className="flex items-start gap-2 text-[10px] text-emerald-400 bg-emerald-950/30 border border-emerald-800/40 rounded-lg p-3">
+                                    <span>✅</span>
+                                    <span>Setelah AI berhasil memverifikasi nominal, URL instansi akan <strong>otomatis dikirim ke bot Telegram Anda</strong> tanpa perlu menunggu konfirmasi manual.</span>
                                 </div>
                             </div>
                         </div>
@@ -544,9 +577,9 @@ function Landing() {
                             <a
                                 href="https://t.me/awbuilderadmin"
                                 target="_blank" rel="noopener noreferrer"
-                                className="flex-1 px-5 py-2.5 rounded-lg bg-white text-black font-extrabold uppercase text-xs tracking-widest hover:bg-zinc-200 transition-all text-center"
+                                className="flex-1 px-5 py-2.5 rounded-lg bg-orange-500 text-black font-extrabold uppercase text-xs tracking-widest hover:bg-orange-400 transition-all text-center"
                             >
-                                Kirim Bukti ke Admin →
+                                📸 Kirim Bukti Bayar →
                             </a>
                         </div>
                     </div>
