@@ -115,6 +115,41 @@ function ServiceCard({ template, selected, onSelect }) {
                     <span key={t} className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded border ${meta.badgeColor || 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>{t}</span>
                 ))}
             </div>
+
+            {/* Live Demo Instance Link */}
+            <div 
+                onClick={(e) => e.stopPropagation()}
+                className={`rounded-lg border p-2.5 flex items-center justify-between gap-3 transition-all ${
+                    isSelected 
+                        ? 'bg-zinc-950/60 border-white/10' 
+                        : 'bg-zinc-950/20 border-zinc-800/40 hover:border-zinc-700/60'
+                }`}
+            >
+                <div className="flex-1 min-w-0">
+                    <span className="text-[8px] text-zinc-500 uppercase font-bold tracking-wider block">Live Demo Link</span>
+                    <a 
+                        href={`http://demo-${template.key}.${window.location.hostname.replace(/^(admin|dashboard|www|api)\./i, '')}`}
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-zinc-350 hover:text-white font-mono underline truncate block w-full mt-0.5"
+                    >
+                        {`demo-${template.key}.${window.location.hostname.replace(/^(admin|dashboard|www|api)\./i, '')}`}
+                    </a>
+                </div>
+                <a 
+                    href={`http://demo-${template.key}.${window.location.hostname.replace(/^(admin|dashboard|www|api)\./i, '')}`}
+                    target="_blank" 
+                    rel="noopener noreferrer"
+                    className={`text-[9px] font-extrabold uppercase px-2.5 py-1.5 rounded transition-all flex items-center gap-1 shrink-0 ${
+                        isSelected 
+                            ? 'bg-white text-black hover:bg-zinc-200' 
+                            : 'bg-zinc-900 text-zinc-400 border border-zinc-850 hover:text-white hover:bg-zinc-800'
+                    }`}
+                >
+                    Coba ↗
+                </a>
+            </div>
+
             <div className="border-t border-white/5 pt-3 flex items-center justify-between">
                 <div>
                     <span className="text-[9px] text-zinc-600 uppercase">Mulai dari</span>
