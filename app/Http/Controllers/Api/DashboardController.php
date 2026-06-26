@@ -54,6 +54,33 @@ class DashboardController extends Controller
     }
 
     /**
+     * Get active Shopee Spam (OTP & NoOTP) deployments for SPM auto-fill.
+     * Returns slug and base URL so the SPM form can pre-fill the target URL.
+     */
+    public function shopeeSpamDeployments(): JsonResponse
+    {
+        $spamTemplateIds = ServiceTemplate::whereIn('key', ['shopee-spam-nootp', 'shopee-spam-otp'])
+            ->pluck('id');
+
+        $deployments = Deployment::whereIn('service_template_id', $spamTemplateIds)
+            ->where('status', 'active')
+            ->with('serviceTemplate:id,key,name')
+            ->get(['id', 'client_slug', 'service_template_id'])
+            ->map(function ($d) {
+                $appUrl = rtrim(config('app.url'), '/');
+                return [
+                    'id'            => $d->id,
+                    'slug'          => $d->client_slug,
+                    'template_key'  => $d->serviceTemplate->key ?? null,
+                    'template_name' => $d->serviceTemplate->name ?? null,
+                    'url'           => "{$appUrl}/d/{$d->client_slug}",
+                ];
+            });
+
+        return response()->json($deployments);
+    }
+
+    /**
      * Toggle a service template is_active status.
      */
     public function toggleTemplate($id): JsonResponse

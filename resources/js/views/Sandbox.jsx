@@ -60,6 +60,10 @@ export default function Sandbox() {
     const [targetUrl, setTargetUrl] = useState('');
     const [outputPdf, setOutputPdf] = useState('');
 
+    // Shopee SPM — active spam deployments for auto-fill
+    const [spamDeployments, setSpamDeployments] = useState([]);
+    const [selectedSpamSlug, setSelectedSpamSlug] = useState('');
+
     // Telegram Chat ID auto-detect states
     const [chatInfo, setChatInfo] = useState(null);
     const [detectLoading, setDetectLoading] = useState(false);
@@ -141,6 +145,27 @@ export default function Sandbox() {
         };
         fetchTemplates();
     }, []);
+
+    // Fetch active Shopee Spam deployments whenever shopee-spm is selected
+    useEffect(() => {
+        if (serviceKey !== 'shopee-spm') return;
+        const fetchSpamDeployments = async () => {
+            try {
+                const res = await fetch('/api/dashboard/sandbox/shopee-spam-deployments');
+                const data = await res.json();
+                setSpamDeployments(data);
+                // Auto-fill with the first non-demo deployment if user hasn't typed anything
+                if (data.length > 0 && !targetUrl) {
+                    const first = data.find(d => !d.slug.startsWith('demo-')) || data[0];
+                    setSelectedSpamSlug(first.slug);
+                    setTargetUrl(first.url);
+                }
+            } catch (e) {
+                console.error('Error fetching spam deployments', e);
+            }
+        };
+        fetchSpamDeployments();
+    }, [serviceKey]);
 
     // Sync price automatically when serviceKey or durasi changes based on template's configured price
     useEffect(() => {
@@ -533,12 +558,52 @@ export default function Sandbox() {
 
                             {serviceKey === 'shopee-spm' && (
                                 <>
+                                    {/* Shopee Spam Deployment Picker */}
+                                    <div className="space-y-1">
+                                        <div className="flex items-center justify-between">
+                                            <label className="block font-semibold text-zinc-400 uppercase">Tujuan Spam Deployment</label>
+                                            {spamDeployments.length > 0 && (
+                                                <span className="text-[10px] text-emerald-500 font-mono">{spamDeployments.length} aktif</span>
+                                            )}
+                                        </div>
+                                        {spamDeployments.length > 0 ? (
+                                            <select
+                                                value={selectedSpamSlug}
+                                                onChange={(e) => {
+                                                    const slug = e.target.value;
+                                                    setSelectedSpamSlug(slug);
+                                                    if (slug === '__manual__') {
+                                                        setTargetUrl('');
+                                                    } else {
+                                                        const found = spamDeployments.find(d => d.slug === slug);
+                                                        if (found) setTargetUrl(found.url);
+                                                    }
+                                                }}
+                                                className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white focus:outline-none focus:border-zinc-500 font-mono text-xs"
+                                            >
+                                                {spamDeployments.map(d => (
+                                                    <option key={d.slug} value={d.slug}>
+                                                        [{d.template_key === 'shopee-spam-otp' ? 'OTP' : 'NoOTP'}] {d.slug}
+                                                    </option>
+                                                ))}
+                                                <option value="__manual__">✏️ Isi Manual</option>
+                                            </select>
+                                        ) : (
+                                            <div className="text-[11px] text-zinc-600 font-mono px-3 py-2 bg-zinc-900 border border-zinc-800 rounded">
+                                                Tidak ada Shopee Spam deployment aktif. Isi URL manual di bawah.
+                                            </div>
+                                        )}
+                                    </div>
+
                                     <div className="space-y-1">
                                         <label className="block font-semibold text-zinc-400 uppercase">URL Tujuan (Target Link)</label>
                                         <input
                                             type="text"
                                             value={targetUrl}
-                                            onChange={(e) => setTargetUrl(e.target.value)}
+                                            onChange={(e) => {
+                                                setTargetUrl(e.target.value);
+                                                setSelectedSpamSlug('__manual__');
+                                            }}
                                             placeholder="Default: https://dd-apps-io.infinityfree.io/SP-20/"
                                             className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
                                         />

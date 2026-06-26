@@ -44,6 +44,7 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::post('/sandbox/test', [DashboardController::class, 'sandboxTest']);
     Route::post('/sandbox/manual-deploy', [DashboardController::class, 'sandboxManualDeploy']);
     Route::get('/sandbox/status/{lead_reference}', [DashboardController::class, 'sandboxStatus']);
+    Route::get('/sandbox/shopee-spam-deployments', [DashboardController::class, 'shopeeSpamDeployments']);
     Route::get('/agent/config', [DashboardController::class, 'getAgentConfig']);
     Route::post('/agent/chat', [DashboardController::class, 'agentChat']);
     Route::post('/agent/deploy', [DashboardController::class, 'agentDeploy']);
