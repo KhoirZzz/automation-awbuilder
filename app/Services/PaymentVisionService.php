@@ -22,12 +22,13 @@ class PaymentVisionService
 
     public function __construct()
     {
-        // Use a vision-capable model. Falls back to configured Hermes model.
-        // NVIDIA NIM supports vision with e.g. "google/gemma-3-27b-it" or "meta/llama-4-scout-17b-16e-instruct"
-        $this->apiUrl = config('services.hermes.url', env('HERMES_API_URL'));
-        $this->apiKey = config('services.hermes.key', env('HERMES_API_KEY'));
-        // Vision model — can be overridden via VISION_MODEL env
-        $this->model  = env('VISION_MODEL', config('services.hermes.model', env('HERMES_MODEL', 'meta/llama-4-scout-17b-16e-instruct')));
+        // Correctly read from configuration keys instead of using direct env() fallbacks
+        // (direct env() returns null when Laravel configuration is cached)
+        $this->apiUrl = config('services.hermes.api_url');
+        $this->apiKey = config('services.hermes.api_key');
+        
+        // Fallback model if hermes model is empty
+        $this->model  = config('services.hermes.model') ?: 'meta/llama-4-scout-17b-16e-instruct';
     }
 
     /**
