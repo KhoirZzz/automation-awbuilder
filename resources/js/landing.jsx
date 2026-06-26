@@ -291,7 +291,11 @@ function Landing() {
             {/* ── Top Nav ── */}
             <header className="sticky top-0 z-40 border-b border-zinc-900 bg-black/80 backdrop-blur-md px-5 py-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
-                    <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center text-sm font-black text-white">S</div>
+                    <img 
+                        src="/logo/awbuilder.png" 
+                        alt="S" 
+                        className="h-8 w-8 object-cover rounded-lg"
+                    />
                     <div>
                         <span className="font-black text-white text-sm tracking-tight block">AWBuilder Store</span>
                         <span className="text-[9px] text-zinc-500 tracking-widest uppercase -mt-0.5 block">Auto Deploy Service</span>
