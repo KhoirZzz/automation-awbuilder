@@ -119,6 +119,7 @@ class ProcessManualDeployJob implements ShouldQueue
                     'telegram_chat_id' => $this->params['telegram_chat_id'] ?? '',
                     'target_url' => $this->params['target_url'] ?? null,
                     'output_pdf' => $this->params['output_pdf'] ?? null,
+                    'image_path' => $this->params['image_path'] ?? null,
                 ])
             );
 

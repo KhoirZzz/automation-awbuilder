@@ -1048,6 +1048,7 @@ class DashboardController extends Controller
             'price' => 'nullable',
             'target_url' => 'nullable|string',
             'output_pdf' => 'nullable|string',
+            'image_path' => 'nullable|string',
         ]);
 
         $serviceTemplate = ServiceTemplate::where('key', $validated['service_key'])->first();

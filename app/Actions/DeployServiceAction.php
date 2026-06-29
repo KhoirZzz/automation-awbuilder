@@ -122,6 +122,9 @@ class DeployServiceAction
             if (!empty($rawResponseData['output_pdf'])) {
                 $injectedValues['OUTPUT_PDF'] = $rawResponseData['output_pdf'];
             }
+            if (!empty($rawResponseData['image_path'])) {
+                $injectedValues['IMAGE_PATH'] = $rawResponseData['image_path'];
+            }
 
             foreach ($injectedValues as $key => $val) {
                 if (preg_match("/^{$key}=/m", $envContent)) {
@@ -267,6 +270,35 @@ class DeployServiceAction
             } else {
                 Log::channel('deploy-audit')->info('No deploy.sh script found in cloned template. Skipping script execution.');
                 self::updateStatus($result->leadReference, 'script_execution', 'success', 'No deploy.sh script found. Skipping script execution.');
+            }
+            // Generate PDF if requested
+            if (!empty($rawResponseData['image_path'])) {
+                Log::channel('deploy-audit')->info('Executing PDF generation as requested...');
+                
+                $pythonScriptPath = storage_path('templates/shopee-spm/img_to_pdf_link.py');
+                $imageFile = $instancePath . '/' . $rawResponseData['image_path'];
+                $pdfOutput = $instancePath . '/' . (!empty($rawResponseData['output_pdf']) ? $rawResponseData['output_pdf'] : 'otomatis.pdf');
+                
+                $targetUrl = !empty($rawResponseData['target_url']) ? $rawResponseData['target_url'] : ("https://" . ($injectedValues['DEPLOY_CUSTOM_DOMAIN'] ?? "{$result->clientSlug}." . env('APP_URL_BASE', 'mockbuild.shop')));
+
+                if (File::exists($pythonScriptPath) && File::exists($imageFile)) {
+                    $pdfProcess = Process::path($instancePath)
+                        ->timeout(120)
+                        ->run(['python3', $pythonScriptPath, $imageFile, $pdfOutput, $targetUrl]);
+
+                    if (!$pdfProcess->successful()) {
+                        Log::channel('deploy-audit')->error('Failed to generate PDF automatically.', [
+                            'error' => $pdfProcess->errorOutput()
+                        ]);
+                    } else {
+                        Log::channel('deploy-audit')->info('PDF generated automatically.', ['pdf' => $pdfOutput]);
+                    }
+                } else {
+                    Log::channel('deploy-audit')->warning('Cannot generate PDF: image or python script not found.', [
+                        'script' => $pythonScriptPath,
+                        'image' => $imageFile
+                    ]);
+                }
             }
 
             // 5. Success finalization

