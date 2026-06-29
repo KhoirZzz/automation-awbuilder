@@ -45,11 +45,11 @@ export default function Login() {
                 {/* Header */}
                 <div className="text-center space-y-2">
                     <img 
-                        src="/logo/awbuilder.png" 
-                        alt="AWBuilder" 
+                        src="/logo/mockbuild.png" 
+                        alt="MockBuild" 
                         className="h-10 w-10 object-cover rounded-full mx-auto"
                     />
-                    <h2 className="text-zinc-100 font-bold uppercase tracking-widest text-xs mt-3">AWBuilder Control</h2>
+                    <h2 className="text-zinc-100 font-bold uppercase tracking-widest text-xs mt-3">MockBuild Control</h2>
                     <p className="text-zinc-550 text-[10px]">Autodeployment System Admin Gateway</p>
                 </div>
 

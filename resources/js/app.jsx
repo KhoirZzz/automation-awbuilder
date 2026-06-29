@@ -123,7 +123,7 @@ function App() {
                 if (hasNewPending && 'Notification' in window && Notification.permission === 'granted') {
                     new Notification("Pesanan Baru Menunggu Approval", {
                         body: `Subdomain: ${newestSlug}\nTemplate: ${newestTemplate}`,
-                        icon: '/logo/awbuilder.png',
+                        icon: '/logo/mockbuild.png',
                         requireInteraction: true
                     });
                     
@@ -173,8 +173,8 @@ function App() {
             <header className="lg:hidden flex items-center justify-between px-4 py-4 bg-zinc-950 border-b border-zinc-900 sticky top-0 z-30">
                 <div className="flex items-center gap-2.5">
                     <img 
-                        src="/logo/awbuilder.png" 
-                        alt="AWBuilder" 
+                        src="/logo/mockbuild.png" 
+                        alt="MockBuild" 
                         className="h-7 w-7 object-cover rounded-full"
                     />
                     <div>
@@ -235,8 +235,8 @@ function App() {
                         <div className="relative group">
                             <div className="absolute -inset-0.5 bg-gradient-to-r from-zinc-800 to-zinc-650 rounded-full blur opacity-20 group-hover:opacity-50 transition duration-500"></div>
                             <img 
-                                src="/logo/awbuilder.png" 
-                                alt="AWBuilder" 
+                                src="/logo/mockbuild.png" 
+                                alt="MockBuild" 
                                 className="relative h-8.5 w-8.5 object-cover rounded-full border border-zinc-800"
                             />
                         </div>

@@ -10,7 +10,9 @@
                 document.documentElement.setAttribute('data-theme', savedTheme);
             } catch (e) {}
         </script>
-        <title>AI-Driven Auto-Deployment System</title>
+        <title>MockBuild - Admin Control Center</title>
+        <!-- Favicon -->
+        <link rel="icon" type="image/png" href="/logo/favicon.png">
         <link rel="preconnect" href="https://fonts.googleapis.com">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
@@ -21,8 +23,8 @@
         <!-- iOS PWA Specific Meta Tags -->
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-        <meta name="apple-mobile-web-app-title" content="AWBuilder">
-        <link rel="apple-touch-icon" href="/logo/awbuilder.png">
+        <meta name="apple-mobile-web-app-title" content="MockBuild">
+        <link rel="apple-touch-icon" href="/logo/mockbuild.png">
 
         @viteReactRefresh
         @vite(['resources/css/app.css', 'resources/js/app.jsx'])

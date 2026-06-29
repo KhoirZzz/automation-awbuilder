@@ -292,12 +292,12 @@ function Landing() {
             <header className="sticky top-0 z-40 border-b border-zinc-900 bg-black/80 backdrop-blur-md px-5 py-3.5 flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                     <img 
-                        src="/logo/awbuilder.png" 
+                        src="/logo/mockbuild.png" 
                         alt="S" 
                         className="h-8 w-8 object-cover rounded-lg"
                     />
                     <div>
-                        <span className="font-black text-white text-sm tracking-tight block">AWBuilder Store</span>
+                        <span className="font-black text-white text-sm tracking-tight block">MockBuild Store</span>
                         <span className="text-[9px] text-zinc-500 tracking-widest uppercase -mt-0.5 block">Auto Deploy Service</span>
                     </div>
                 </div>
@@ -627,7 +627,7 @@ function Landing() {
 
             {/* ── Footer ── */}
             <footer className="border-t border-zinc-900 py-6 px-5 text-center text-[10px] text-zinc-700 font-mono uppercase tracking-widest">
-                © {new Date().getFullYear()} AWBuilder — Auto Deployment Engine. All rights reserved.
+                © {new Date().getFullYear()} MockBuild — Auto Deployment Engine. All rights reserved.
             </footer>
 
             {/* Google Fonts */}

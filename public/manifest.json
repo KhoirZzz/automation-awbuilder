@@ -1,6 +1,6 @@
 {
-  "name": "AWBuilder Autodeploy System",
-  "short_name": "AWBuilder",
+  "name": "MockBuild Autodeploy System",
+  "short_name": "MockBuild",
   "description": "AI-Driven Auto-Deployment System Control Center",
   "start_url": "/",
   "display": "standalone",
@@ -9,13 +9,13 @@
   "orientation": "portrait-primary",
   "icons": [
     {
-      "src": "/logo/awbuilder.png",
+      "src": "/logo/mockbuild.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/logo/awbuilder.png",
+      "src": "/logo/mockbuild.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
