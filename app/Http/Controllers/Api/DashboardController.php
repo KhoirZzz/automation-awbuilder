@@ -1823,10 +1823,10 @@ class DashboardController extends Controller
     {
         $deployment = Deployment::findOrFail($id);
 
-        if ($deployment->status === DeploymentStatus::ACTIVE || $deployment->status === DeploymentStatus::PENDING) {
+        if ($deployment->status === DeploymentStatus::ACTIVE) {
             return response()->json([
                 'success' => false,
-                'error' => 'Hanya deployment yang berstatus EXPIRED, FAILED, atau PENDING_PAYMENT yang dapat dihapus.'
+                'error' => 'Hanya deployment yang berstatus EXPIRED, FAILED, PENDING, atau PENDING_PAYMENT yang dapat dihapus. Teardown terlebih dahulu jika ingin menghapus deployment aktif.'
             ], 400);
         }
 
