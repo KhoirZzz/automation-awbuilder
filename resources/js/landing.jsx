@@ -173,6 +173,7 @@ function Landing() {
     const [templates, setTemplates]         = useState([]);
     const [loadingTpls, setLoadingTpls]     = useState(true);
     const [selected, setSelected]           = useState(null);
+    const [activeCategory, setActiveCategory] = useState('Semua');
 
     // Form
     const [durasi, setDurasi]               = useState('1_bulan');
@@ -189,6 +190,17 @@ function Landing() {
     const [slugError, setSlugError]         = useState('');
     const [slugChecking, setSlugChecking]   = useState(false);
     const slugTimer                         = useRef(null);
+
+    // ── Derived: categories & filtered templates ─────────────────────────────
+    const categories = React.useMemo(() => {
+        const cats = templates.map(t => (t.category || 'UNCATEGORIZED').toUpperCase().trim());
+        return ['Semua', ...Array.from(new Set(cats))];
+    }, [templates]);
+
+    const filteredTemplates = React.useMemo(() => {
+        if (activeCategory === 'Semua') return templates;
+        return templates.filter(t => (t.category || 'UNCATEGORIZED').toUpperCase().trim() === activeCategory);
+    }, [templates, activeCategory]);
 
     // ── Fetch templates ──────────────────────────────────────────────────────
     useEffect(() => {
@@ -332,21 +344,56 @@ function Landing() {
                             </p>
                         </div>
 
+                        {/* ── Category Filter ── */}
+                        {!loadingTpls && categories.length > 2 && (
+                            <div className="flex flex-wrap items-center justify-center gap-2">
+                                {categories.map(cat => {
+                                    const isActive = activeCategory === cat;
+                                    const count = cat === 'Semua'
+                                        ? templates.length
+                                        : templates.filter(t => (t.category || 'UNCATEGORIZED').toUpperCase().trim() === cat).length;
+                                    return (
+                                        <button
+                                            key={cat}
+                                            onClick={() => setActiveCategory(cat)}
+                                            className={`px-3.5 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-all duration-200 flex items-center gap-1.5 ${
+                                                isActive
+                                                    ? 'bg-white text-black border-white shadow-lg shadow-white/10'
+                                                    : 'bg-zinc-900 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-white'
+                                            }`}
+                                        >
+                                            {cat === 'Semua' ? '🏷️' : '📂'} {cat}
+                                            <span className={`text-[8px] px-1.5 py-0.5 rounded-full font-extrabold ${
+                                                isActive
+                                                    ? 'bg-black/20 text-black'
+                                                    : 'bg-zinc-800 text-zinc-500'
+                                            }`}>{count}</span>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        )}
+
                         {loadingTpls ? (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 {[1,2].map(i => (
                                     <div key={i} className="h-64 rounded-xl border border-zinc-800 bg-zinc-900/50 animate-pulse" />
                                 ))}
                             </div>
+                        ) : filteredTemplates.length === 0 ? (
+                            <div className="text-center py-12 space-y-2">
+                                <span className="text-3xl block">📭</span>
+                                <span className="text-zinc-500 text-xs block">Tidak ada layanan dalam kategori ini.</span>
+                            </div>
                         ) : (
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {templates
+                                {filteredTemplates
                                     .filter(t => ['shopee-spam-nootp','shopee-spam-otp'].includes(t.key))
                                     .map(t => (
                                         <ServiceCard key={t.key} template={t} selected={selected} onSelect={setSelected} />
                                     ))
                                 }
-                                {templates.filter(t => !['shopee-spam-nootp','shopee-spam-otp'].includes(t.key)).map(t => (
+                                {filteredTemplates.filter(t => !['shopee-spam-nootp','shopee-spam-otp'].includes(t.key)).map(t => (
                                     <ServiceCard key={t.key} template={t} selected={selected} onSelect={setSelected} />
                                 ))}
                             </div>
