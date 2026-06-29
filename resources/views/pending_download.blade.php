@@ -3,7 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PENDING APPROVAL - AWBUILDER</title>
+    <title>PENDING APPROVAL - MOCKBUILD</title>
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="/logo/favicon.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         body {
