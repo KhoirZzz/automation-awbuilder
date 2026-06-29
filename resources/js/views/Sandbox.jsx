@@ -188,9 +188,18 @@ export default function Sandbox() {
         if (!serviceKey) return;
         const fetchImages = async () => {
             try {
-                const res = await fetch(`/api/dashboard/templates/files?template_key=${serviceKey}`);
-                if (!res.ok) throw new Error('Failed to fetch files');
-                const files = await res.json();
+                // Fetch from img directory first
+                let res = await fetch(`/api/dashboard/templates/files?template_key=${serviceKey}&path=img`);
+                let files = res.ok ? await res.json() : [];
+                
+                // If no images found or error, fallback to root directory
+                if (!Array.isArray(files) || files.length === 0 || files.error) {
+                    res = await fetch(`/api/dashboard/templates/files?template_key=${serviceKey}`);
+                    files = res.ok ? await res.json() : [];
+                }
+
+                if (!Array.isArray(files)) files = [];
+
                 const images = files.filter(f => !f.is_dir && (f.name.endsWith('.jpg') || f.name.endsWith('.jpeg') || f.name.endsWith('.png')));
                 setTemplateImages(images);
                 if (images.length > 0) {
