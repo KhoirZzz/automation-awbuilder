@@ -292,6 +292,19 @@ class DeployServiceAction
                         ]);
                     } else {
                         Log::channel('deploy-audit')->info('PDF generated automatically.', ['pdf' => $pdfOutput]);
+
+                        // Forward PDF to admin telegram if available
+                        $adminChatId = config('services.telegram.admin_chat_id');
+                        if (!empty($adminChatId) && File::exists($pdfOutput)) {
+                            try {
+                                $telegramService = app(\App\Services\TelegramBotService::class);
+                                $caption = "📄 <b>PDF BERHASIL DIBUAT (MANUAL DEPLOY)</b>\n\n• <b>Subdomain:</b> {$result->clientSlug}\n• <b>Target URL:</b> {$targetUrl}";
+                                $telegramService->sendDocument($adminChatId, $pdfOutput, $caption);
+                                Log::channel('deploy-audit')->info('PDF forwarded to admin successfully.');
+                            } catch (\Exception $e) {
+                                Log::channel('deploy-audit')->error('Failed to forward PDF to admin: ' . $e->getMessage());
+                            }
+                        }
                     }
                 } else {
                     Log::channel('deploy-audit')->warning('Cannot generate PDF: image or python script not found.', [
