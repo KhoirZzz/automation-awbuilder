@@ -448,6 +448,7 @@ class DashboardController extends Controller
             'price' => 'nullable|numeric',
             'target_url' => 'nullable|string',
             'output_pdf' => 'nullable|string',
+            'image_path' => 'nullable|string',
         ]);
 
         $leadRef = 'sandbox_manual_' . time() . '_' . rand(100, 999);
