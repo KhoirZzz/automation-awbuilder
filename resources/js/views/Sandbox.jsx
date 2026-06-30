@@ -617,7 +617,7 @@ export default function Sandbox() {
                                                         className="w-full bg-zinc-900 border border-zinc-800 rounded px-3 py-2 text-white focus:outline-none focus:border-zinc-500 font-mono text-xs"
                                                     >
                                                         {templateImages.map(img => (
-                                                            <option key={img.path} value={img.name}>{img.name}</option>
+                                                            <option key={img.path} value={img.path}>{img.name}</option>
                                                         ))}
                                                     </select>
                                                 ) : (
