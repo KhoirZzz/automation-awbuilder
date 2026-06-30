@@ -188,8 +188,8 @@ export default function Sandbox() {
         if (!serviceKey) return;
         const fetchImages = async () => {
             try {
-                // Fetch from img directory first
-                let res = await fetch(`/api/dashboard/templates/files?template_key=${serviceKey}&path=img`);
+                // Fetch from image-pdf directory first
+                let res = await fetch(`/api/dashboard/templates/files?template_key=${serviceKey}&path=image-pdf`);
                 let files = res.ok ? await res.json() : [];
                 
                 // If no images found or error, fallback to root directory
@@ -625,7 +625,16 @@ export default function Sandbox() {
                                                         Mencari gambar di template...
                                                     </div>
                                                 )}
-                                                <span className="text-[10px] text-zinc-600 block">Gambar akan diubah ke PDF, jika diklik akan otomatis redirect ke subdomain baru.</span>
+                                                {selectedImage && (
+                                                    <div className="mt-2 border border-zinc-800 rounded overflow-hidden max-w-[200px] bg-zinc-900 flex justify-center">
+                                                        <img 
+                                                            src={`/api/dashboard/templates/file/stream?template_key=${serviceKey}&path=${encodeURIComponent(selectedImage)}&passkey=${localStorage.getItem('admin_passkey')}`} 
+                                                            alt="Preview" 
+                                                            className="max-h-[150px] object-contain"
+                                                        />
+                                                    </div>
+                                                )}
+                                                <span className="text-[10px] text-zinc-600 block mt-1">Gambar akan diubah ke PDF, jika diklik akan otomatis redirect ke subdomain baru.</span>
                                             </div>
                                             <div className="space-y-1">
                                                 <label className="block font-semibold text-zinc-400 uppercase text-[10px]">Nama File PDF Output (Opsional)</label>

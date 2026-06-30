@@ -1442,6 +1442,24 @@ class DashboardController extends Controller
     }
 
     /**
+     * Stream file from template (e.g. for images).
+     */
+    public function streamFile(Request $request)
+    {
+        $validated = $request->validate([
+            'template_key' => 'required|string',
+            'path' => 'required|string'
+        ]);
+
+        $targetPath = $this->resolveTemplatePath($validated['template_key'], $validated['path']);
+        if (!$targetPath || !File::exists($targetPath) || File::isDirectory($targetPath)) {
+            abort(404);
+        }
+
+        return response()->file($targetPath);
+    }
+
+    /**
      * Create file or folder inside a template.
      */
     public function createFileOrFolder(Request $request): JsonResponse

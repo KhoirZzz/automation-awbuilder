@@ -61,6 +61,7 @@ Route::prefix('/dashboard')->middleware(\App\Http\Middleware\VerifyAdminPasskey:
     Route::delete('/templates/zips/{filename}', [DashboardController::class, 'destroyZip']);
     Route::get('/templates/files', [DashboardController::class, 'listFiles']);
     Route::get('/templates/file/content', [DashboardController::class, 'getFileContent']);
+    Route::get('/templates/file/stream', [DashboardController::class, 'streamFile']);
     Route::post('/templates/file', [DashboardController::class, 'createFileOrFolder']);
     Route::put('/templates/file', [DashboardController::class, 'updateFileContent']);
     Route::delete('/templates/file', [DashboardController::class, 'deleteFileOrFolder']);

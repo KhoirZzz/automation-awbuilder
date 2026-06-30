@@ -14,7 +14,7 @@ class VerifyAdminPasskey
     public function handle(Request $request, Closure $next): Response
     {
         $correctPasskey = config('deploy.agent_passkey', '852963');
-        $headerPasskey = $request->header('X-Admin-Passkey');
+        $headerPasskey = $request->header('X-Admin-Passkey') ?? $request->query('passkey');
 
         if (empty($correctPasskey) || $headerPasskey !== $correctPasskey) {
             return response()->json(['error' => 'Akses ditolak. Passkey admin tidak valid atau kosong.'], 401);
